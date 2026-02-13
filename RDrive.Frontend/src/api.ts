@@ -56,6 +56,29 @@ export interface RTask {
     stats: TransferStats | null;
 }
 
+export interface ProviderOption {
+    Name: string;
+    FieldName: string;
+    Help: string;
+    Provider: string;
+    Default: any;
+    Examples: { Value: string; Help: string; Provider: string }[] | null;
+    Required: boolean;
+    IsPassword: boolean;
+    Advanced: boolean;
+    Exclusive: boolean;
+    Sensitive: boolean;
+    Hide: number;
+    NoPrefix: boolean;
+}
+
+export interface Provider {
+    Name: string;
+    Description: string;
+    Prefix: string;
+    Options: ProviderOption[];
+}
+
 const API_BASE = '/api';
 
 export const api = {
@@ -214,5 +237,58 @@ export const api = {
     clearCompletedTasks: async (): Promise<void> => {
         const res = await fetch(`${API_BASE}/tasks`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to clear tasks');
+    },
+
+    // Remote config management
+    getProviders: async (): Promise<Provider[]> => {
+        const res = await fetch(`${API_BASE}/remotes/providers`);
+        if (!res.ok) throw new Error('Failed to fetch providers');
+        return res.json();
+    },
+
+    getRemoteConfig: async (name: string): Promise<Record<string, string>> => {
+        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}/config`);
+        if (!res.ok) throw new Error('Failed to fetch remote config');
+        return res.json();
+    },
+
+    createRemote: async (name: string, type: string, parameters: Record<string, string>): Promise<void> => {
+        const res = await fetch(`${API_BASE}/remotes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, type, parameters })
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to create remote');
+        }
+    },
+
+    updateRemote: async (name: string, parameters: Record<string, string>): Promise<void> => {
+        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ parameters })
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to update remote');
+        }
+    },
+
+    deleteRemote: async (name: string): Promise<void> => {
+        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
+            method: 'DELETE'
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to delete remote');
+        }
+    },
+
+    dumpConfig: async (): Promise<Record<string, Record<string, string>>> => {
+        const res = await fetch(`${API_BASE}/remotes/dump`);
+        if (!res.ok) throw new Error('Failed to dump config');
+        return res.json();
     }
 };

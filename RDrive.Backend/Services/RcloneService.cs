@@ -189,6 +189,75 @@ public class RcloneService
         }
     }
 
+    // --- Config management ---
+
+    public async Task<List<RcloneProvider>> GetProvidersAsync()
+    {
+        var response = await _http.PostAsJsonAsync("config/providers", new { });
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<RcloneProvidersResponse>();
+        return result?.Providers ?? new List<RcloneProvider>();
+    }
+
+    public async Task<Dictionary<string, string>> GetRemoteConfigAsync(string name)
+    {
+        var response = await _http.PostAsJsonAsync("config/get", new { name });
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+        return result ?? new Dictionary<string, string>();
+    }
+
+    public async Task CreateRemoteAsync(string name, string type, Dictionary<string, string> parameters)
+    {
+        var payload = new
+        {
+            name,
+            type,
+            parameters,
+            opt = new { obscure = true, nonInteractive = true }
+        };
+        var response = await _http.PostAsJsonAsync("config/create", payload);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Rclone config/create failed: {error}");
+        }
+    }
+
+    public async Task UpdateRemoteAsync(string name, Dictionary<string, string> parameters)
+    {
+        var payload = new
+        {
+            name,
+            parameters,
+            opt = new { obscure = true, nonInteractive = true }
+        };
+        var response = await _http.PostAsJsonAsync("config/update", payload);
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Rclone config/update failed: {error}");
+        }
+    }
+
+    public async Task DeleteRemoteAsync(string name)
+    {
+        var response = await _http.PostAsJsonAsync("config/delete", new { name });
+        if (!response.IsSuccessStatusCode)
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Rclone config/delete failed: {error}");
+        }
+    }
+
+    public async Task<Dictionary<string, Dictionary<string, string>>> ConfigDumpAsync()
+    {
+        var response = await _http.PostAsJsonAsync("config/dump", new { });
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<Dictionary<string, Dictionary<string, string>>>();
+        return result ?? new Dictionary<string, Dictionary<string, string>>();
+    }
+
     // Helper to get raw HttpClient for streaming if needed, or expose specific methods
     public HttpClient Client => _http;
 }

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } fro
 import Login from './Login';
 import FileBrowser from './FileBrowser';
 import Jobs from './Jobs';
+import RemoteConfig from './RemoteConfig';
 import { api } from './api';
 import './index.css';
 
@@ -41,6 +42,7 @@ function PrivateLayout() {
           <nav className="p-4 space-y-2">
             <Link to="/" className={linkClass('/')}>My Remotes</Link>
             <Link to="/jobs" className={linkClass('/jobs')}>Jobs</Link>
+            <Link to="/config" className={linkClass('/config')}>Configure</Link>
             <a href="#" className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">Shared with me</a>
             <a href="#" className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">Recent</a>
             <a href="#" className="block px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300">Trash</a>
@@ -73,10 +75,9 @@ function Dashboard() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white">My Remotes</h2>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
-          {/* Remotes must be added via config for now */}
+        <Link to="/config" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
           <span>Configure Remote</span>
-        </button>
+        </Link>
       </div>
 
       {remotes.length === 0 ? (
@@ -122,6 +123,7 @@ function App() {
         <Route element={<PrivateLayout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/jobs" element={<Jobs />} />
+          <Route path="/config" element={<RemoteConfig />} />
           <Route path="/remotes/:remoteName/*" element={<FileBrowser />} />
         </Route>
       </Routes>

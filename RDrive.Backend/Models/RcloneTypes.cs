@@ -151,3 +151,92 @@ public class RcloneTransferringItem
     [JsonPropertyName("speedAvg")]
     public double SpeedAvg { get; set; }
 }
+
+// --- Config / Provider types ---
+
+public class RcloneProvidersResponse
+{
+    [JsonPropertyName("providers")]
+    public List<RcloneProvider> Providers { get; set; } = new();
+}
+
+public class RcloneProvider
+{
+    [JsonPropertyName("Name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("Description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("Prefix")]
+    public string Prefix { get; set; } = string.Empty;
+
+    [JsonPropertyName("Options")]
+    public List<RcloneProviderOption> Options { get; set; } = new();
+}
+
+public class RcloneProviderOption
+{
+    [JsonPropertyName("Name")]
+    public string Name { get; set; } = string.Empty;
+
+    [JsonPropertyName("FieldName")]
+    public string FieldName { get; set; } = string.Empty;
+
+    [JsonPropertyName("Help")]
+    public string Help { get; set; } = string.Empty;
+
+    [JsonPropertyName("Provider")]
+    public string Provider { get; set; } = string.Empty;
+
+    [JsonPropertyName("Default")]
+    public object? Default { get; set; }
+
+    [JsonPropertyName("Examples")]
+    public List<RcloneOptionExample>? Examples { get; set; }
+
+    [JsonPropertyName("Required")]
+    public bool Required { get; set; }
+
+    [JsonPropertyName("IsPassword")]
+    public bool IsPassword { get; set; }
+
+    [JsonPropertyName("Advanced")]
+    public bool Advanced { get; set; }
+
+    [JsonPropertyName("Exclusive")]
+    public bool Exclusive { get; set; }
+
+    [JsonPropertyName("Sensitive")]
+    public bool Sensitive { get; set; }
+
+    [JsonPropertyName("Hide")]
+    public int Hide { get; set; }
+
+    [JsonPropertyName("NoPrefix")]
+    public bool NoPrefix { get; set; }
+}
+
+public class RcloneOptionExample
+{
+    [JsonPropertyName("Value")]
+    public string Value { get; set; } = string.Empty;
+
+    [JsonPropertyName("Help")]
+    public string Help { get; set; } = string.Empty;
+
+    [JsonPropertyName("Provider")]
+    public string Provider { get; set; } = string.Empty;
+}
+
+public class CreateRemoteRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string Type { get; set; } = string.Empty;
+    public Dictionary<string, string> Parameters { get; set; } = new();
+}
+
+public class UpdateRemoteRequest
+{
+    public Dictionary<string, string> Parameters { get; set; } = new();
+}
