@@ -1,0 +1,6 @@
+@RDrive.Backend_HostAddress = http://localhost:5197
+
+GET {{RDrive.Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
