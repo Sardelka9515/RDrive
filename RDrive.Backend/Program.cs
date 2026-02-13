@@ -78,9 +78,19 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+var wsOptions = new WebSocketOptions();
+if (app.Environment.IsDevelopment())
+{
+    wsOptions.AllowedOrigins.Add("http://localhost:5173");
+}
+app.UseWebSockets(wsOptions);
 
 app.UseCors();
+
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthentication();
 app.UseAuthorization();
