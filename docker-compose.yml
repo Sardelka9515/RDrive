@@ -1,0 +1,20 @@
+services:
+  rdrive:
+    build: .
+    container_name: rdrive
+    ports:
+      - "8080:8080"
+    volumes:
+      - rclone-config:/root/.config/rclone
+      - rdrive-data:/app/rdrive.db
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Rclone__Path=rclone
+      - Rclone__Address=http://127.0.0.1:5572
+      - Rclone__User=admin
+      - Rclone__Password=securepass
+    restart: unless-stopped
+
+volumes:
+  rclone-config:
+  rdrive-data:
