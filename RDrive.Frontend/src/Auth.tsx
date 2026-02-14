@@ -53,6 +53,25 @@ function createUserManager(config: AuthConfig): UserManager {
     });
 }
 
+// Module-level singletons to survive StrictMode double-mount
+let _userManager: UserManager | null = null;
+let _callbackPromise: Promise<User | null> | null = null;
+
+function getOrCreateUserManager(config: AuthConfig): UserManager {
+    if (!_userManager) {
+        _userManager = createUserManager(config);
+    }
+    return _userManager;
+}
+
+function processCallback(mgr: UserManager): Promise<User | null> {
+    if (!_callbackPromise) {
+        _callbackPromise = mgr.signinRedirectCallback()
+            .catch(() => mgr.getUser());
+    }
+    return _callbackPromise;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
@@ -75,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
 
                 setAuthEnabled(true);
-                const mgr = createUserManager(config);
+                const mgr = getOrCreateUserManager(config);
                 userManagerRef.current = mgr;
 
                 // Wire token getter for API calls
@@ -87,15 +106,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                 // Handle redirect callback
                 if (window.location.pathname === '/callback') {
-                    try {
-                        const cbUser = await mgr.signinRedirectCallback();
-                        if (!cancelled) setUser(cbUser);
-                        // Restore original URL or go to root
-                        const returnUrl = sessionStorage.getItem('rdrive_return_url') || '/';
-                        sessionStorage.removeItem('rdrive_return_url');
-                        window.history.replaceState({}, '', returnUrl);
-                    } catch {
-                        window.history.replaceState({}, '', '/');
+                    const cbUser = await processCallback(mgr);
+                    if (!cancelled && cbUser && !cbUser.expired) {
+                        setUser(cbUser);
                     }
                     if (!cancelled) setIsLoading(false);
                     return;

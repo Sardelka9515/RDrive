@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import FileBrowser from './FileBrowser';
 import Jobs from './Jobs';
 import RemoteConfig from './RemoteConfig';
@@ -7,6 +7,35 @@ import { api } from './api';
 import { ToastProvider, useToast } from './Toast';
 import { AuthProvider, useAuth } from './Auth';
 import './index.css';
+
+function CallbackHandler() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      const returnUrl = sessionStorage.getItem('rdrive_return_url') || '/';
+      sessionStorage.removeItem('rdrive_return_url');
+      navigate(returnUrl, { replace: true });
+    }
+  }, [isLoading, isAuthenticated, navigate]);
+
+  // Already authenticated (e.g. page refresh) — redirect immediately
+  if (!isLoading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Not authenticated after loading — go to login
+  if (!isLoading && !isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+      <div className="text-gray-500 dark:text-gray-400">Signing in...</div>
+    </div>
+  );
+}
 
 function LoginPage() {
   const { login, isLoading } = useAuth();
@@ -162,7 +191,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/callback" element={<div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center"><div className="text-gray-500">Signing in...</div></div>} />
+            <Route path="/callback" element={<CallbackHandler />} />
 
             <Route element={<PrivateLayout />}>
               <Route path="/" element={<Dashboard />} />

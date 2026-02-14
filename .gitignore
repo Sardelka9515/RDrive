@@ -427,3 +427,4 @@ FodyWeavers.xsd
 *.msm
 *.msp
 /RDrive.Backend/rdrive.db
+/RDrive.Backend/appsettings.Development.json
