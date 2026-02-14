@@ -1,17 +1,19 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { UserManager, User, WebStorageStateStore } from 'oidc-client-ts';
-import { setTokenGetter } from './api';
+import { setTokenGetter, setAccessDeniedHandler } from './api';
 
 interface AuthConfig {
     enabled: boolean;
     authority: string | null;
     clientId: string | null;
+    requiredRole: string | null;
 }
 
 interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
+    accessDenied: boolean;
     user: User | null;
     userName: string | null;
     login: () => void;
@@ -22,6 +24,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
     isAuthenticated: false,
     isLoading: true,
+    accessDenied: false,
     user: null,
     userName: null,
     login: () => {},
@@ -75,8 +78,10 @@ function processCallback(mgr: UserManager): Promise<User | null> {
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [user, setUser] = useState<User | null>(null);
+    const [accessDenied, setAccessDenied] = useState(false);
     const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
     const userManagerRef = useRef<UserManager | null>(null);
+    const requiredRoleRef = useRef<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -96,12 +101,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAuthEnabled(true);
                 const mgr = getOrCreateUserManager(config);
                 userManagerRef.current = mgr;
+                requiredRoleRef.current = config.requiredRole;
 
                 // Wire token getter for API calls
                 setTokenGetter(async () => {
                     const u = await mgr.getUser();
                     if (!u || u.expired) return null;
                     return u.access_token;
+                });
+
+                // Wire access denied handler
+                setAccessDeniedHandler((denied: boolean) => {
+                    if (!cancelled) setAccessDenied(denied);
                 });
 
                 // Handle redirect callback
@@ -165,7 +176,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return u.access_token;
     }, []);
 
-    const isAuthenticated = authEnabled === false || (user != null && !user.expired);
+    // Reset access denied when user changes
+    useEffect(() => {
+        setAccessDenied(false);
+    }, [user]);
+
+    const isAuthenticated = authEnabled === false || (user != null && !user.expired && !accessDenied);
 
     const userName = user?.profile?.preferred_username
         || user?.profile?.name
@@ -176,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         <AuthContext.Provider value={{
             isAuthenticated,
             isLoading,
+            accessDenied,
             user,
             userName,
             login,

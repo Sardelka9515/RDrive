@@ -2,31 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace RDrive.Backend.Models;
 
-public class Space
-{
-    public int Id { get; set; }
-    
-    [Required]
-    public string Name { get; set; } = string.Empty;
-    
-    [Required]
-    public string RcloneRemotePath { get; set; } = string.Empty; // e.g. "s3:bucket/marketing"
-    
-    public Guid OwnerId { get; set; }
-}
-
-public class UserSpacePermission
-{
-    public int Id { get; set; }
-    
-    public Guid UserId { get; set; }
-    
-    public int SpaceId { get; set; }
-    public Space? Space { get; set; }
-    
-    public string Role { get; set; } = "User"; // User, Manager
-}
-
 public class RTask 
 {
     public Guid Id { get; set; }
@@ -56,7 +31,6 @@ public class Share
     public Guid Id { get; set; }
     
     public int SpaceId { get; set; }
-    public Space? Space { get; set; }
     
     public string Path { get; set; } = string.Empty;
     

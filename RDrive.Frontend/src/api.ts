@@ -83,9 +83,14 @@ const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 // Token getter, set by AuthProvider
 let _getToken: (() => Promise<string | null>) | null = null;
+let _accessDeniedHandler: ((denied: boolean) => void) | null = null;
 
 export function setTokenGetter(getter: () => Promise<string | null>) {
     _getToken = getter;
+}
+
+export function setAccessDeniedHandler(handler: (denied: boolean) => void) {
+    _accessDeniedHandler = handler;
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -97,10 +102,17 @@ async function authHeaders(): Promise<Record<string, string>> {
 
 async function authFetch(url: string, init?: RequestInit): Promise<Response> {
     const headers = await authHeaders();
-    return fetch(url, {
+    const res = await fetch(url, {
         ...init,
         headers: { ...headers, ...init?.headers },
     });
+    
+    // Notify auth provider of access denied status
+    if (res.status === 401 || res.status === 403) {
+        _accessDeniedHandler?.(true);
+    }
+    
+    return res;
 }
 
 export const api = {

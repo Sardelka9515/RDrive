@@ -62,13 +62,34 @@ function LoginPage() {
 }
 
 function PrivateLayout() {
-  const { isAuthenticated, isLoading, userName, logout } = useAuth();
+  const { isAuthenticated, isLoading, accessDenied, userName, logout } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="text-red-500 text-5xl mb-4">&#x26D4;</div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Access Denied</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            Your account does not have the required <strong>rdrive-user</strong> role.
+            Contact your administrator to request access.
+          </p>
+          <button
+            onClick={logout}
+            className="px-5 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition font-medium"
+          >
+            Sign out
+          </button>
+        </div>
       </div>
     );
   }

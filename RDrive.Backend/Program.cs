@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using RDrive.Backend.Models;
 using RDrive.Backend.Services;
 using RDrive.Backend.Data;
@@ -83,7 +84,15 @@ if (authEnabled)
                 }
             };
         });
-    builder.Services.AddAuthorization();
+
+    var requiredRole = builder.Configuration["Authentication:RequiredRole"] ?? "rdrive-user";
+    builder.Services.AddAuthorization(options =>
+    {
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .RequireRole(requiredRole)
+            .Build();
+    });
 }
 else
 {
@@ -143,6 +152,7 @@ app.MapGet("/api/auth/config", () => Results.Ok(new
     enabled = authEnabled,
     authority = authEnabled ? app.Configuration["Authentication:Authority"] : null,
     clientId = authEnabled ? app.Configuration["Authentication:ClientId"] : null,
+    requiredRole = authEnabled ? (app.Configuration["Authentication:RequiredRole"] ?? "rdrive-user") : null,
 })).AllowAnonymous();
 
 app.MapControllers();
