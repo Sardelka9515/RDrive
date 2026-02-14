@@ -55,7 +55,7 @@ export function useFileOperations({
         const srcPath = joinPath(currentPath, file.Name);
         const dstPath = joinPath(currentPath, newName);
         try {
-            await api.renameFile(remoteName, srcPath, dstPath);
+            await api.renameFile(remoteName, srcPath, dstPath, file.IsDir);
             onReload();
         } catch (error: any) {
             onError(`Rename failed: ${error.message}`);
@@ -119,7 +119,7 @@ export function useFileOperations({
                 const srcPath = joinPath(currentPath, file.Name);
                 const dst = joinPath(targetPath, file.Name);
                 if (srcPath === dst) continue;
-                await api.renameFile(remoteName, srcPath, dst);
+                await api.renameFile(remoteName, srcPath, dst, file.IsDir);
             }
             onReload();
         } catch (error: any) {

@@ -206,11 +206,11 @@ export const api = {
         return res.json();
     },
 
-    renameFile: async (remoteName: string, path: string, newPath: string): Promise<void> => {
+    renameFile: async (remoteName: string, path: string, newPath: string, isDir: boolean = false): Promise<void> => {
         const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/rename/${encodeURIComponent(path)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ NewPath: newPath })
+            body: JSON.stringify({ NewPath: newPath, IsDir: isDir })
         });
         if (!res.ok) {
             const text = await res.text();

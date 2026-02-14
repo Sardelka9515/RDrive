@@ -282,7 +282,18 @@ public class FilesController : ControllerBase
             var srcPath = Uri.UnescapeDataString(path).TrimStart('/');
             var dstPath = request.NewPath.TrimStart('/');
             
-            await _rclone.MoveFileAsync(fs, srcPath, fs, dstPath);
+            if (request.IsDir)
+            {
+                // For directories, use the async job-based move
+                var srcFull = $"{fs}/{srcPath}";
+                var dstFull = $"{fs}/{dstPath}";
+                await _rclone.StartMoveAsync(srcFull, dstFull);
+            }
+            else
+            {
+                // For files, use the synchronous move
+                await _rclone.MoveFileAsync(fs, srcPath, fs, dstPath);
+            }
             return Ok();
         }
         catch (Exception ex)
@@ -319,6 +330,7 @@ public class FileOperationRequest
 public class RenameRequest
 {
     public string NewPath { get; set; } = "";
+    public bool IsDir { get; set; }
 }
 
 public static class MultipartRequestHelper
