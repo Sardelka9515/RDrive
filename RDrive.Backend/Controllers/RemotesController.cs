@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RDrive.Backend.Models;
 using RDrive.Backend.Services;
 
 namespace RDrive.Backend.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class RemotesController : ControllerBase

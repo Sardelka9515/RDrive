@@ -54,14 +54,47 @@ Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
-// Authentication
-builder.Services.AddAuthentication()
-    .AddJwtBearer(options =>
+// Authentication (optional OIDC)
+var authEnabled = !string.IsNullOrEmpty(builder.Configuration["Authentication:Authority"]);
+if (authEnabled)
+{
+    builder.Services.AddAuthentication("Bearer")
+        .AddJwtBearer("Bearer", options =>
+        {
+            options.Authority = builder.Configuration["Authentication:Authority"];
+            options.Audience = builder.Configuration["Authentication:Audience"];
+            options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+            options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+            {
+                ValidateAudience = !string.IsNullOrEmpty(builder.Configuration["Authentication:Audience"]),
+                ValidateIssuer = true,
+            };
+            // Support token from query string for WebSocket connections
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.WebSockets.IsWebSocketRequest)
+                    {
+                        context.Token = accessToken;
+                    }
+                    return Task.CompletedTask;
+                }
+            };
+        });
+    builder.Services.AddAuthorization();
+}
+else
+{
+    // No-op auth: all requests are allowed
+    builder.Services.AddAuthorization(options =>
     {
-        options.Authority = builder.Configuration["Authentication:Authority"];
-        options.Audience = builder.Configuration["Authentication:Audience"];
-        options.RequireHttpsMetadata = false; // Dev only
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAssertion(_ => true)
+            .Build();
     });
+}
 
 var app = builder.Build();
 
@@ -96,6 +129,14 @@ if (!app.Environment.IsDevelopment())
 
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Auth info endpoint (public, no auth required)
+app.MapGet("/api/auth/config", () => Results.Ok(new
+{
+    enabled = authEnabled,
+    authority = authEnabled ? app.Configuration["Authentication:Authority"] : null,
+    clientId = authEnabled ? app.Configuration["Authentication:ClientId"] : null,
+}));
 
 app.MapControllers();
 

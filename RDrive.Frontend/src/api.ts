@@ -81,21 +81,43 @@ export interface Provider {
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
+// Token getter, set by AuthProvider
+let _getToken: (() => Promise<string | null>) | null = null;
+
+export function setTokenGetter(getter: () => Promise<string | null>) {
+    _getToken = getter;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+    if (!_getToken) return {};
+    const token = await _getToken();
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+}
+
+async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+    const headers = await authHeaders();
+    return fetch(url, {
+        ...init,
+        headers: { ...headers, ...init?.headers },
+    });
+}
+
 export const api = {
     getRemotes: async (): Promise<string[]> => {
-        const res = await fetch(`${API_BASE}/remotes`);
+        const res = await authFetch(`${API_BASE}/remotes`);
         if (!res.ok) throw new Error('Failed to fetch remotes');
         return res.json();
     },
 
     listFiles: async (remoteName: string, path: string = '', signal?: AbortSignal): Promise<FileItem[]> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files?path=${encodeURIComponent(path)}`, { signal });
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files?path=${encodeURIComponent(path)}`, { signal });
         if (!res.ok) throw new Error('Failed to fetch files');
         return res.json();
     },
 
     uploadFile: (remoteName: string, parentPath: string, file: File, onProgress?: (progress: number) => void): Promise<void> => {
-        return new Promise((resolve, reject) => {
+        return new Promise(async (resolve, reject) => {
             const formData = new FormData();
             formData.append('file', file);
 
@@ -106,6 +128,12 @@ export const api = {
             // Encode each segment of the path individually to preserve slashes
             const encodedPath = fullPath.split('/').map(encodeURIComponent).join('/');
             xhr.open('POST', `${API_BASE}/remotes/${remoteName}/files/upload/${encodedPath}`);
+
+            // Attach auth token
+            const headers = await authHeaders();
+            for (const [key, value] of Object.entries(headers)) {
+                xhr.setRequestHeader(key, value);
+            }
 
             if (onProgress) {
                 xhr.upload.onprogress = (event) => {
@@ -131,7 +159,7 @@ export const api = {
     },
 
     deleteFile: async (remoteName: string, path: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files/${encodeURIComponent(path)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/${encodeURIComponent(path)}`, {
             method: 'DELETE'
         });
         if (!res.ok) {
@@ -141,7 +169,7 @@ export const api = {
     },
 
     copyFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files/copy/${encodeURIComponent(path)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/copy/${encodeURIComponent(path)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ DestinationRemote: dstRemote, DestinationPath: dstPath, IsDir: isDir })
@@ -154,7 +182,7 @@ export const api = {
     },
 
     moveFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files/move/${encodeURIComponent(path)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/move/${encodeURIComponent(path)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ DestinationRemote: dstRemote, DestinationPath: dstPath, IsDir: isDir })
@@ -167,7 +195,7 @@ export const api = {
     },
 
     renameFile: async (remoteName: string, path: string, newPath: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files/rename/${encodeURIComponent(path)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/rename/${encodeURIComponent(path)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ NewPath: newPath })
@@ -179,7 +207,7 @@ export const api = {
     },
 
     startSync: async (srcRemote: string, srcPath: string, dstRemote: string, dstPath: string): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/tasks/sync`, {
+        const res = await authFetch(`${API_BASE}/tasks/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ SourceRemote: srcRemote, SourcePath: srcPath, DestRemote: dstRemote, DestPath: dstPath })
@@ -192,7 +220,7 @@ export const api = {
     },
 
     createDirectory: async (remoteName: string, path: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes/${remoteName}/files/mkdir/${encodeURIComponent(path)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/mkdir/${encodeURIComponent(path)}`, {
             method: 'POST'
         });
         if (!res.ok) {
@@ -203,30 +231,30 @@ export const api = {
 
     // Jobs / Tasks API
     getTasks: async (): Promise<RTask[]> => {
-        const res = await fetch(`${API_BASE}/tasks`);
+        const res = await authFetch(`${API_BASE}/tasks`);
         if (!res.ok) throw new Error('Failed to fetch tasks');
         return res.json();
     },
 
     getTask: async (id: string): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/tasks/${id}`);
+        const res = await authFetch(`${API_BASE}/tasks/${id}`);
         if (!res.ok) throw new Error('Failed to fetch task');
         return res.json();
     },
 
     stopTask: async (id: string): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/tasks/${id}/stop`, { method: 'POST' });
+        const res = await authFetch(`${API_BASE}/tasks/${id}/stop`, { method: 'POST' });
         if (!res.ok) throw new Error('Failed to stop task');
         return res.json();
     },
 
     deleteTask: async (id: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
+        const res = await authFetch(`${API_BASE}/tasks/${id}`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to delete task');
     },
 
     restartTask: async (id: string): Promise<RTask> => {
-        const res = await fetch(`${API_BASE}/tasks/${id}/restart`, { method: 'POST' });
+        const res = await authFetch(`${API_BASE}/tasks/${id}/restart`, { method: 'POST' });
         if (!res.ok) {
             const text = await res.text();
             throw new Error(text || 'Failed to restart task');
@@ -235,25 +263,25 @@ export const api = {
     },
 
     clearCompletedTasks: async (): Promise<void> => {
-        const res = await fetch(`${API_BASE}/tasks`, { method: 'DELETE' });
+        const res = await authFetch(`${API_BASE}/tasks`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to clear tasks');
     },
 
     // Remote config management
     getProviders: async (): Promise<Provider[]> => {
-        const res = await fetch(`${API_BASE}/remotes/providers`);
+        const res = await authFetch(`${API_BASE}/remotes/providers`);
         if (!res.ok) throw new Error('Failed to fetch providers');
         return res.json();
     },
 
     getRemoteConfig: async (name: string): Promise<Record<string, string>> => {
-        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}/config`);
+        const res = await authFetch(`${API_BASE}/remotes/${encodeURIComponent(name)}/config`);
         if (!res.ok) throw new Error('Failed to fetch remote config');
         return res.json();
     },
 
     createRemote: async (name: string, type: string, parameters: Record<string, string>): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes`, {
+        const res = await authFetch(`${API_BASE}/remotes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, type, parameters })
@@ -265,7 +293,7 @@ export const api = {
     },
 
     updateRemote: async (name: string, parameters: Record<string, string>): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ parameters })
@@ -277,7 +305,7 @@ export const api = {
     },
 
     deleteRemote: async (name: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
+        const res = await authFetch(`${API_BASE}/remotes/${encodeURIComponent(name)}`, {
             method: 'DELETE'
         });
         if (!res.ok) {
@@ -287,7 +315,7 @@ export const api = {
     },
 
     dumpConfig: async (): Promise<Record<string, Record<string, string>>> => {
-        const res = await fetch(`${API_BASE}/remotes/dump`);
+        const res = await authFetch(`${API_BASE}/remotes/dump`);
         if (!res.ok) throw new Error('Failed to dump config');
         return res.json();
     }

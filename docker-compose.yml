@@ -14,6 +14,10 @@ services:
       - Rclone__Address=http://127.0.0.1:5572
       - Rclone__User=admin
       - Rclone__Password=securepass
+      # OIDC authentication (leave empty to disable)
+      # - Authentication__Authority=https://keycloak.example.com/realms/rdrive
+      # - Authentication__Audience=account
+      # - Authentication__ClientId=rdrive
     restart: unless-stopped
 
 volumes:

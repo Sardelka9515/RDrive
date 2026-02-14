@@ -1,12 +1,14 @@
 using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using RDrive.Backend.Models;
 
 namespace RDrive.Backend.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class TerminalController : ControllerBase

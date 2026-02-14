@@ -1,19 +1,49 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
-import Login from './Login';
 import FileBrowser from './FileBrowser';
 import Jobs from './Jobs';
 import RemoteConfig from './RemoteConfig';
 import { api } from './api';
 import { ToastProvider, useToast } from './Toast';
+import { AuthProvider, useAuth } from './Auth';
 import './index.css';
 
+function LoginPage() {
+  const { login, isLoading } = useAuth();
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+        <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">RDrive</h1>
+        <h2 className="text-xl text-gray-600 dark:text-gray-400 mb-8">Sign in to continue</h2>
+        <button
+          onClick={login}
+          disabled={isLoading}
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
+        >
+          Sign in with SSO
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PrivateLayout() {
-  // TODO: Check auth state
-  const isAuthenticated = true; // Mock for now
+  const { isAuthenticated, isLoading, userName, logout } = useAuth();
   const location = useLocation();
 
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-gray-500 dark:text-gray-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} />;
+
+  const displayName = userName || 'User';
+  const initial = displayName.charAt(0).toUpperCase();
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -32,8 +62,17 @@ function PrivateLayout() {
       <header className="bg-white dark:bg-gray-800 shadow p-4 flex justify-between items-center z-10 relative">
         <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">RDrive</h1>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-600 dark:text-gray-300">Admin</span>
-          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300 font-bold">A</div>
+          <span className="text-sm text-gray-600 dark:text-gray-300">{displayName}</span>
+          <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center text-blue-600 dark:text-blue-300 font-bold">{initial}</div>
+          {userName && (
+            <button
+              onClick={logout}
+              className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition"
+              title="Sign out"
+            >
+              Sign out
+            </button>
+          )}
         </div>
       </header>
 
@@ -119,18 +158,21 @@ function Dashboard() {
 function App() {
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/callback" element={<div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center"><div className="text-gray-500">Signing in...</div></div>} />
 
-          <Route element={<PrivateLayout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/jobs" element={<Jobs />} />
-            <Route path="/config" element={<RemoteConfig />} />
-            <Route path="/remotes/:remoteName/*" element={<FileBrowser />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+            <Route element={<PrivateLayout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/jobs" element={<Jobs />} />
+              <Route path="/config" element={<RemoteConfig />} />
+              <Route path="/remotes/:remoteName/*" element={<FileBrowser />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </ToastProvider>
   );
 }

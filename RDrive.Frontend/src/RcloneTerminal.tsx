@@ -3,6 +3,7 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
+import { useAuth } from './Auth';
 
 interface RcloneTerminalProps {
     onClose: () => void;
@@ -16,8 +17,11 @@ export default function RcloneTerminal({ onClose, onDone }: RcloneTerminalProps)
     const fitAddonRef = useRef<FitAddon | null>(null);
     const onCloseRef = useRef(onClose);
     const onDoneRef = useRef(onDone);
+    const { getAccessToken } = useAuth();
+    const getAccessTokenRef = useRef(getAccessToken);
     onCloseRef.current = onClose;
     onDoneRef.current = onDone;
+    getAccessTokenRef.current = getAccessToken;
 
     useEffect(() => {
         if (!termRef.current) return;
@@ -73,12 +77,17 @@ export default function RcloneTerminal({ onClose, onDone }: RcloneTerminalProps)
 
         // Connect WebSocket (deferred to avoid StrictMode double-mount errors)
         let ws: WebSocket | null = null;
-        const connectTimer = setTimeout(() => {
+        const connectTimer = setTimeout(async () => {
             if (cancelled) return;
             const apiBase = import.meta.env.VITE_API_BASE || '/api';
             const base = new URL(apiBase, window.location.origin);
             const protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${base.host}${base.pathname}/terminal/ws`;
+            let wsUrl = `${protocol}//${base.host}${base.pathname}/terminal/ws`;
+
+            // Attach token as query param (browsers can't set WS headers)
+            const token = await getAccessTokenRef.current();
+            if (token) wsUrl += `?access_token=${encodeURIComponent(token)}`;
+
             ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 

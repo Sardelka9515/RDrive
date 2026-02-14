@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RDrive.Backend.Data;
 using RDrive.Backend.Models;
@@ -10,6 +11,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace RDrive.Backend.Controllers;
 
+[Authorize]
 [ApiController]
 [Route("api/remotes/{remoteName}/files")]
 public class FilesController : ControllerBase
