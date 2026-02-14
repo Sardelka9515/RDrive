@@ -180,6 +180,23 @@ export const api = {
         }
     },
 
+    downloadFile: async (remoteName: string, path: string, fileName: string): Promise<void> => {
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/${encodeURIComponent(path)}`);
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to download file');
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    },
+
     copyFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
         const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/copy/${encodeURIComponent(path)}`, {
             method: 'POST',

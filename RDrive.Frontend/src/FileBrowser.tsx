@@ -128,9 +128,16 @@ export default function FileBrowser() {
 
     const handleFileDoubleClick = (e: React.MouseEvent, file: FileItem) => {
         e.stopPropagation();
+        if (!remoteName) return;
         const targetPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
-        if (file.IsDir) navigate(`/remotes/${remoteName}/${targetPath}`);
-        else window.open(`/api/remotes/${remoteName}/files/${targetPath}`, '_blank');
+        if (file.IsDir) {
+            navigate(`/remotes/${remoteName}/${targetPath}`);
+        } else {
+            api.downloadFile(remoteName, targetPath, file.Name).catch(err => {
+                console.error('Download failed:', err);
+                showError(`Failed to download: ${err.message}`);
+            });
+        }
     };
 
     /* ── Context menu ─────────────────────────────────── */
