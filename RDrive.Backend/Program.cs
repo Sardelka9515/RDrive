@@ -152,7 +152,6 @@ app.MapGet("/api/auth/config", () => Results.Ok(new
     enabled = authEnabled,
     authority = authEnabled ? app.Configuration["Authentication:Authority"] : null,
     clientId = authEnabled ? app.Configuration["Authentication:ClientId"] : null,
-    requiredRole = authEnabled ? (app.Configuration["Authentication:RequiredRole"] ?? "rdrive-user") : null,
 })).AllowAnonymous();
 
 app.MapControllers();

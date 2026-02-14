@@ -52,7 +52,7 @@ public class FilesController : ControllerBase
         try
         {
             var fs = await _resolver.GetFsForRemoteAsync(remoteName);
-            var filePath = path.TrimStart('/');
+            var filePath = Uri.UnescapeDataString(path).TrimStart('/');
             
             // Construct internal URL
             // Rclone rc-serve serves at [fs]/[path]
@@ -89,6 +89,7 @@ public class FilesController : ControllerBase
     [RDrive.Backend.Attributes.DisableFormValueModelBinding]
     public async Task<IActionResult> UploadFile([FromRoute] string remoteName, [FromRoute] string path)
     {
+        path = Uri.UnescapeDataString(path);
         Console.WriteLine($"Starting Streaming Upload: {path}");
         try
         {
@@ -172,7 +173,7 @@ public class FilesController : ControllerBase
         try
         {
             var fs = await _resolver.GetFsForRemoteAsync(remoteName);
-            var remotePath = path.TrimStart('/');
+            var remotePath = Uri.UnescapeDataString(path).TrimStart('/');
             
             // Try deleting as file first
             try 
@@ -205,7 +206,7 @@ public class FilesController : ControllerBase
     {
         try
         {
-            var srcPath = path.TrimStart('/');
+            var srcPath = Uri.UnescapeDataString(path).TrimStart('/');
             var dstPath = request.DestinationPath.TrimStart('/');
             
             // Validate remotes exist
@@ -241,7 +242,7 @@ public class FilesController : ControllerBase
     {
         try
         {
-            var srcPath = path.TrimStart('/');
+            var srcPath = Uri.UnescapeDataString(path).TrimStart('/');
             var dstPath = request.DestinationPath.TrimStart('/');
             
             // Validate remotes exist
@@ -278,7 +279,7 @@ public class FilesController : ControllerBase
         try
         {
             var fs = await _resolver.GetFsForRemoteAsync(remoteName);
-            var srcPath = path.TrimStart('/');
+            var srcPath = Uri.UnescapeDataString(path).TrimStart('/');
             var dstPath = request.NewPath.TrimStart('/');
             
             await _rclone.MoveFileAsync(fs, srcPath, fs, dstPath);
@@ -296,7 +297,7 @@ public class FilesController : ControllerBase
         try
         {
             var fs = await _resolver.GetFsForRemoteAsync(remoteName);
-            var remotePath = path.TrimStart('/');
+            var remotePath = Uri.UnescapeDataString(path).TrimStart('/');
             
             await _rclone.MkdirAsync(fs, remotePath);
             return Ok();

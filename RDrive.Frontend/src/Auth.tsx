@@ -7,7 +7,6 @@ interface AuthConfig {
     enabled: boolean;
     authority: string | null;
     clientId: string | null;
-    requiredRole: string | null;
 }
 
 interface AuthContextType {
@@ -81,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [accessDenied, setAccessDenied] = useState(false);
     const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
     const userManagerRef = useRef<UserManager | null>(null);
-    const requiredRoleRef = useRef<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -101,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setAuthEnabled(true);
                 const mgr = getOrCreateUserManager(config);
                 userManagerRef.current = mgr;
-                requiredRoleRef.current = config.requiredRole;
 
                 // Wire token getter for API calls
                 setTokenGetter(async () => {
