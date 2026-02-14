@@ -49,8 +49,10 @@ builder.Services.AddHttpClient<RcloneService>(client =>
 builder.Services.AddScoped<RclonePathResolver>();
 
 // Database
+var dbPath = Path.Combine(AppContext.BaseDirectory, "data", "rdrive.db");
+Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=rdrive.db"));
+    options.UseSqlite($"Data Source={dbPath}"));
 
 // Authentication
 builder.Services.AddAuthentication()
