@@ -85,13 +85,18 @@ if (authEnabled)
             };
         });
 
-    var requiredRole = builder.Configuration["Authentication:RequiredRole"] ?? "rdrive-user";
+    var requiredRole = builder.Configuration["Authentication:RequiredRole"];
     builder.Services.AddAuthorization(options =>
     {
-        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-            .RequireAuthenticatedUser()
-            .RequireRole(requiredRole)
-            .Build();
+        var policyBuilder = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser();
+        
+        if (!string.IsNullOrEmpty(requiredRole))
+        {
+            policyBuilder.RequireRole(requiredRole);
+        }
+        
+        options.DefaultPolicy = policyBuilder.Build();
     });
 }
 else
