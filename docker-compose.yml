@@ -1,6 +1,6 @@
 services:
   rdrive:
-    build: .
+    image: ghcr.io/sardelka9515/rdrive:latest
     container_name: rdrive
     ports:
       - "8080:8080"
