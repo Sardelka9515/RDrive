@@ -122,6 +122,13 @@ app.UseWebSockets(wsOptions);
 
 app.UseCors();
 
+// Serve frontend SPA in production — before auth so static files are served without tokens
+if (!app.Environment.IsDevelopment())
+{
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
+
 if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -136,16 +143,14 @@ app.MapGet("/api/auth/config", () => Results.Ok(new
     enabled = authEnabled,
     authority = authEnabled ? app.Configuration["Authentication:Authority"] : null,
     clientId = authEnabled ? app.Configuration["Authentication:ClientId"] : null,
-}));
+})).AllowAnonymous();
 
 app.MapControllers();
 
-// Serve frontend SPA in production
+// SPA fallback — serves index.html for client-side routes like /callback
 if (!app.Environment.IsDevelopment())
 {
-    app.UseDefaultFiles();
-    app.UseStaticFiles();
-    app.MapFallbackToFile("index.html");
+    app.MapFallbackToFile("index.html").AllowAnonymous();
 }
 
 app.Run();
