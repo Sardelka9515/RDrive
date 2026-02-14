@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { api, type RTask } from './api';
+import { useToast } from './Toast';
 
 const STATUS_COLORS: Record<string, string> = {
     Queued: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
@@ -63,13 +64,14 @@ export default function Jobs() {
     const [tasks, setTasks] = useState<RTask[]>([]);
     const [loading, setLoading] = useState(true);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const { showError } = useToast();
 
     const loadTasks = async () => {
         try {
             const data = await api.getTasks();
             setTasks(data);
-        } catch (err) {
-            console.error('Failed to load tasks:', err);
+        } catch (err: any) {
+            showError(`Failed to load tasks: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -89,8 +91,8 @@ export default function Jobs() {
         try {
             await api.stopTask(id);
             loadTasks();
-        } catch (err) {
-            alert(`Failed to stop task: ${err}`);
+        } catch (err: any) {
+            showError(`Failed to stop task: ${err.message}`);
         }
     };
 
@@ -98,8 +100,8 @@ export default function Jobs() {
         try {
             await api.deleteTask(id);
             setTasks(prev => prev.filter(t => t.id !== id));
-        } catch (err) {
-            alert(`Failed to delete task: ${err}`);
+        } catch (err: any) {
+            showError(`Failed to delete task: ${err.message}`);
         }
     };
 
@@ -107,8 +109,8 @@ export default function Jobs() {
         try {
             await api.clearCompletedTasks();
             loadTasks();
-        } catch (err) {
-            alert(`Failed to clear tasks: ${err}`);
+        } catch (err: any) {
+            showError(`Failed to clear tasks: ${err.message}`);
         }
     };
 
@@ -116,8 +118,8 @@ export default function Jobs() {
         try {
             await api.restartTask(id);
             loadTasks();
-        } catch (err) {
-            alert(`Failed to restart task: ${err}`);
+        } catch (err: any) {
+            showError(`Failed to restart task: ${err.message}`);
         }
     };
 

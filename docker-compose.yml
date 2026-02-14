@@ -4,6 +4,7 @@ services:
     container_name: rdrive
     ports:
       - "8080:8080"
+      - "5572:5572"
     volumes:
       - rclone-config:/root/.config/rclone
       - rdrive-data:/app/rdrive.db

@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { api } from './api';
 import type { Provider, ProviderOption } from './api';
 import RcloneTerminal from './RcloneTerminal';
+import { useToast } from './Toast';
 
 interface RemoteInfo {
     name: string;
@@ -14,6 +15,7 @@ export default function RemoteConfig() {
     const [remotes, setRemotes] = useState<RemoteInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const { showError, showSuccess } = useToast();
 
     // Form state
     const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list');
@@ -48,7 +50,7 @@ export default function RemoteConfig() {
             }));
             setRemotes(remoteInfos);
         } catch (e: any) {
-            setError(e.message);
+            showError(`Failed to load config: ${e.message}`);
         } finally {
             setLoading(false);
         }
@@ -148,6 +150,7 @@ export default function RemoteConfig() {
             }
             await loadData();
             cancelForm();
+            showSuccess(`Remote ${mode === 'create' ? 'created' : 'updated'} successfully`);
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -160,8 +163,9 @@ export default function RemoteConfig() {
             await api.deleteRemote(name);
             setDeleteConfirm(null);
             await loadData();
+            showSuccess(`Remote "${name}" deleted`);
         } catch (e: any) {
-            setError(e.message);
+            showError(`Failed to delete remote: ${e.message}`);
         }
     };
 

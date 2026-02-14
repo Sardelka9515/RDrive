@@ -1,10 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, type FileItem } from './api';
+import { useToast } from './Toast';
 
 export default function FileBrowser() {
     const { remoteName, '*': path } = useParams<{ remoteName: string; '*': string }>();
     const navigate = useNavigate();
+    const { showError, showSuccess } = useToast();
     const currentPath = path || '';
 
     const [files, setFiles] = useState<FileItem[]>([]);
@@ -48,12 +50,12 @@ export default function FileBrowser() {
         setFiles([]);
         api.listFiles(remoteName, currentPath, controller.signal)
             .then(f => { if (!controller.signal.aborted) setFiles(f); })
-            .catch(err => { if (err.name !== 'AbortError') console.error(err); })
+            .catch(err => { if (err.name !== 'AbortError') showError(`Failed to load files: ${err.message}`); })
             .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     };
 
     const loadRemotes = () => {
-        api.getRemotes().then(setRemotes).catch(console.error);
+        api.getRemotes().then(setRemotes).catch(err => showError(`Failed to load remotes: ${err.message}`));
     };
 
     useEffect(() => {
@@ -178,9 +180,8 @@ export default function FileBrowser() {
         try {
             await api.uploadFile(remoteName, currentPath, file, p => setUploadProgress(p));
             loadFiles();
-        } catch (error) {
-            console.error(error);
-            alert('Upload failed');
+        } catch (error: any) {
+            showError(`Upload failed: ${error.message}`);
         } finally {
             setUploading(false);
             setUploadProgress(0);
@@ -197,8 +198,8 @@ export default function FileBrowser() {
         try {
             await api.createDirectory(remoteName, target);
             loadFiles();
-        } catch (error) {
-            alert(`Failed to create folder: ${error}`);
+        } catch (error: any) {
+            showError(`Failed to create folder: ${error.message}`);
         }
     };
 
@@ -213,8 +214,8 @@ export default function FileBrowser() {
         try {
             await api.renameFile(remoteName, srcP, dstP);
             loadFiles();
-        } catch (error) {
-            alert(`Rename failed: ${error}`);
+        } catch (error: any) {
+            showError(`Rename failed: ${error.message}`);
         }
     };
 
@@ -234,8 +235,8 @@ export default function FileBrowser() {
             }));
             setSelectedNames(new Set());
             loadFiles();
-        } catch (error) {
-            alert(`Delete failed: ${error}`);
+        } catch (error: any) {
+            showError(`Delete failed: ${error.message}`);
             loadFiles();
         }
     };
@@ -275,10 +276,10 @@ export default function FileBrowser() {
             setModal(null);
             const n = modal.files.length;
             const op = modal.type.charAt(0).toUpperCase() + modal.type.slice(1);
-            alert(`${op} job${n > 1 ? 's' : ''} started. Check the Jobs page for progress.`);
+            showSuccess(`${op} job${n > 1 ? 's' : ''} started. Check the Jobs page for progress.`);
             if (modal.type === 'move') loadFiles();
-        } catch (error) {
-            alert(`Operation failed: ${error}`);
+        } catch (error: any) {
+            showError(`Operation failed: ${error.message}`);
         } finally {
             setOpLoading(false);
         }
@@ -337,8 +338,8 @@ export default function FileBrowser() {
             }
             setSelectedNames(new Set());
             loadFiles();
-        } catch (error) {
-            alert(`Move failed: ${error}`);
+        } catch (error: any) {
+            showError(`Move failed: ${error.message}`);
             loadFiles();
         }
         setDraggedFiles([]);

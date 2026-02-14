@@ -5,6 +5,7 @@ import FileBrowser from './FileBrowser';
 import Jobs from './Jobs';
 import RemoteConfig from './RemoteConfig';
 import { api } from './api';
+import { ToastProvider, useToast } from './Toast';
 import './index.css';
 
 function PrivateLayout() {
@@ -61,11 +62,12 @@ function PrivateLayout() {
 function Dashboard() {
   const [remotes, setRemotes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showError } = useToast();
 
   useEffect(() => {
     api.getRemotes()
       .then(setRemotes)
-      .catch(console.error)
+      .catch(err => showError(`Failed to load remotes: ${err.message}`))
       .finally(() => setLoading(false));
   }, []);
 
@@ -116,18 +118,20 @@ function Dashboard() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
 
-        <Route element={<PrivateLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/jobs" element={<Jobs />} />
-          <Route path="/config" element={<RemoteConfig />} />
-          <Route path="/remotes/:remoteName/*" element={<FileBrowser />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          <Route element={<PrivateLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/jobs" element={<Jobs />} />
+            <Route path="/config" element={<RemoteConfig />} />
+            <Route path="/remotes/:remoteName/*" element={<FileBrowser />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   );
 }
 
