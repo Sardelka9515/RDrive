@@ -16,12 +16,14 @@ public class PublicSharesController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly RcloneService _rclone;
+    private readonly RclonePathResolver _resolver;
     private static readonly byte[] _secretKey = RandomNumberGenerator.GetBytes(32); // specific to this instance run
 
-    public PublicSharesController(AppDbContext db, RcloneService rclone)
+    public PublicSharesController(AppDbContext db, RcloneService rclone, RclonePathResolver resolver)
     {
         _db = db;
         _rclone = rclone;
+        _resolver = resolver;
     }
 
     [HttpGet("{id}/info")]
@@ -29,7 +31,7 @@ public class PublicSharesController : ControllerBase
     {
         var share = await _db.Shares.FindAsync(id);
         if (share == null) return NotFound("Share not found.");
-        
+
         // Handle expiration
         if (share.Expiration.HasValue && share.Expiration < DateTime.UtcNow)
             return NotFound("Share expired.");
@@ -71,19 +73,19 @@ public class PublicSharesController : ControllerBase
     public async Task<IActionResult> ListFiles(Guid id, string? path = "")
     {
         if (!AuthorizeAccess(id, out var share)) return Unauthorized();
-        
+
         // Verify path traversal
         path = path?.TrimStart('/') ?? "";
         if (path.Contains("..")) return BadRequest("Invalid path.");
 
         // Construct full path
-        var remotePath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
+        var remotePath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".Trim('/');
         // Ensure we don't end with slash if it's empty, but ListFilesAsync handles directories.
         // If path is empty, we list share.Path.
-        
-        try 
+
+        try
         {
-            var files = await _rclone.ListFilesAsync(share.Remote, remotePath);
+            var files = await _rclone.ListFilesAsync(await _resolver.GetFsForRemoteAsync(share.Remote), remotePath);
             return Ok(files);
         }
         catch (Exception ex)
@@ -107,21 +109,22 @@ public class PublicSharesController : ControllerBase
 
         path = path.TrimStart('/');
         if (path.Contains("..")) return BadRequest("Invalid path.");
-        
+
         var remotePath = string.IsNullOrEmpty(share.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
-        
+
         try
         {
-            var stream = await _rclone.GetFileStreamAsync(share.Remote, remotePath);
+            var fs = await _resolver.GetFsForRemoteAsync(share.Remote);
+            var response = await _rclone.DownloadFileAsync(fs, remotePath, Request.Headers["Range"].ToString());
             
-            // Try to guess mime type?
-            var contentType = "application/octet-stream";
-            // Rclone might return it in headers? HttpClient usually has it.
-            // But GetFileStreamAsync returns stream. We lost headers.
-            // We could update GetFileStreamAsync to return (Stream, ContentType) tuple or similar.
-            // For now default.
+            if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
+
+            var stream = await response.Content.ReadAsStreamAsync();
             
-            return File(stream, contentType, Path.GetFileName(path));
+            return File(stream, 
+                response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream", 
+                enableRangeProcessing: true,
+                fileDownloadName: Path.GetFileName(path));
         }
         catch (Exception ex)
         {
@@ -136,18 +139,21 @@ public class PublicSharesController : ControllerBase
 
         path = path.TrimStart('/');
         if (path.Contains("..")) return BadRequest("Invalid path.");
-        
+
         var remotePath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
         // remotePath here is the DIRECTORY or the FILE? 
         // path parameter usually implies directory for upload, or we use the file name?
         // Let's assume `path` is the target directory. The filename comes from IFormFile.
-        
-        var fullRemotePath = string.IsNullOrEmpty(remotePath) ? file.FileName : $"{remotePath}/{file.FileName}";
+
+        var dir = remotePath; // We upload TO this directory.
 
         try
         {
             using var stream = file.OpenReadStream();
-            await _rclone.UploadFileStreamAsync(share.Remote, fullRemotePath, stream, file.ContentType);
+            var fs = await _resolver.GetFsForRemoteAsync(share.Remote);
+            
+            await _rclone.UploadToRemoteAsync(fs, dir, file.FileName, stream, file.ContentType);
+            
             return Ok();
         }
         catch (Exception ex)
@@ -175,50 +181,50 @@ public class PublicSharesController : ControllerBase
         // 2. Check Recipients restrictions
         // If recipients exist, user MUST be authenticated via main Auth and match email
         // OR we support "Public" access if IsPublic is true.
-        
+
         if (share.Recipients.Any())
         {
-             // If IsPublic is false, we strictly enforce recipient check.
-             // If IsPublic is true, maybe recipients are for Write access?
-             // Let's stick to: If Recipients exist AND IsPublic is false -> Restricted.
-             // If IsPublic is true -> Open to everyone (Recipients ignored for Read, but maybe used for Write?)
-             
-             if (!share.IsPublic)
-             {
-                 // User must be logged in
-                 // Since this controller is not [Authorize], we need to check User.Identity manually if available.
-                 // We might need to mix [Authorize] on specific paths or check HttpContext.User
-                 // Note: If the user is authenticated via Bearer token (main app login), User.Identity.Name should be set.
-                 
-                 var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
-                 if (string.IsNullOrEmpty(userEmail)) return false; // Not logged in
-                 
-                 var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
-                 if (recipient == null) return false; // Not on list
-                 
-                 if (requireWrite && recipient.Permission != "Write") return false;
-             }
-             else
-             {
-                 // Public share, but maybe checking write permission?
-                 if (requireWrite)
-                 {
-                     // Public RW? Unlikely to be safe.
-                     // Assume Public is ReadOnly unless specific recipient?
-                     // Let's safe default: Public = Read Only. 
-                     // Write requires specific recipient permission?
-                     // Or separate "Public Write" flag (not in schema).
-                     
-                     // Check if user is in recipient list with Write
-                     var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
-                     if (!string.IsNullOrEmpty(userEmail))
-                     {
-                         var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
-                         if (recipient != null && recipient.Permission == "Write") return true;
-                     }
-                     return false; // Public write not allowed by default
-                 }
-             }
+            // If IsPublic is false, we strictly enforce recipient check.
+            // If IsPublic is true, maybe recipients are for Write access?
+            // Let's stick to: If Recipients exist AND IsPublic is false -> Restricted.
+            // If IsPublic is true -> Open to everyone (Recipients ignored for Read, but maybe used for Write?)
+
+            if (!share.IsPublic)
+            {
+                // User must be logged in
+                // Since this controller is not [Authorize], we need to check User.Identity manually if available.
+                // We might need to mix [Authorize] on specific paths or check HttpContext.User
+                // Note: If the user is authenticated via Bearer token (main app login), User.Identity.Name should be set.
+
+                var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
+                if (string.IsNullOrEmpty(userEmail)) return false; // Not logged in
+
+                var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
+                if (recipient == null) return false; // Not on list
+
+                if (requireWrite && recipient.Permission != "Write") return false;
+            }
+            else
+            {
+                // Public share, but maybe checking write permission?
+                if (requireWrite)
+                {
+                    // Public RW? Unlikely to be safe.
+                    // Assume Public is ReadOnly unless specific recipient?
+                    // Let's safe default: Public = Read Only. 
+                    // Write requires specific recipient permission?
+                    // Or separate "Public Write" flag (not in schema).
+
+                    // Check if user is in recipient list with Write
+                    var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
+                    if (!string.IsNullOrEmpty(userEmail))
+                    {
+                        var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
+                        if (recipient != null && recipient.Permission == "Write") return true;
+                    }
+                    return false; // Public write not allowed by default
+                }
+            }
         }
         else
         {
@@ -245,7 +251,7 @@ public class PublicSharesController : ControllerBase
         {
             var parts = Encoding.UTF8.GetString(Convert.FromBase64String(token)).Split('|');
             if (parts.Length != 3) return false;
-            
+
             var sid = Guid.Parse(parts[0]);
             var expiry = long.Parse(parts[1]);
             var sig = parts[2];
@@ -255,7 +261,7 @@ public class PublicSharesController : ControllerBase
 
             using var hmac = new HMACSHA256(_secretKey);
             var computedSig = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes($"{sid}|{expiry}")));
-            
+
             return sig == computedSig;
         }
         catch

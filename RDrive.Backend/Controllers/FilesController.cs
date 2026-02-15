@@ -54,21 +54,7 @@ public class FilesController : ControllerBase
             var fs = await _resolver.GetFsForRemoteAsync(remoteName);
             var filePath = Uri.UnescapeDataString(path).TrimStart('/');
             
-            // Construct internal URL
-            // Rclone rc-serve serves at [fs]/[path]
-            string internalUrl = $"{_rclone.Client.BaseAddress}[{fs}]/{filePath}";
-            
-            var request = new HttpRequestMessage(HttpMethod.Get, internalUrl);
-            
-            // Forward Range header
-            if (Request.Headers.TryGetValue("Range", out var range))
-            {
-                request.Headers.Add("Range", range.ToString());
-            }
-
-            request.Headers.Authorization = _rclone.Client.DefaultRequestHeaders.Authorization;
-
-            var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            var response = await _rclone.DownloadFileAsync(fs, filePath, Request.Headers["Range"].ToString());
             
             if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
 
@@ -117,45 +103,20 @@ public class FilesController : ControllerBase
                 {
                     if (MultipartRequestHelper.HasFileContentDisposition(contentDisposition))
                     {
-                        var url = $"operations/uploadfile?fs={Uri.EscapeDataString(fs)}&remote={Uri.EscapeDataString(dir)}";
-                        
-                        using var content = new MultipartFormDataContent();
-                        
-                        // STREAMING: Pass the section.Body stream directly to HttpClient
-                        // rclone rcd via HttpClient needs to read from this stream.
-                        using var streamContent = new StreamContent(section.Body);
-                        
-                        if (section.ContentType != null)
-                        {
-                            if (System.Net.Http.Headers.MediaTypeHeaderValue.TryParse(section.ContentType, out var contentType))
-                            {
-                                streamContent.Headers.ContentType = contentType;
-                            }
-                        }
-                        
-                        content.Add(streamContent, "file", targetFileName);
+                        using var stream = section.Body;
+                        // Use the content type from the section (or fallback to octet-stream)
+                        var contentType = section.ContentType ?? "application/octet-stream";
 
-                        Console.WriteLine($"Streaming to Rclone: {url}");
+                        Console.WriteLine($"Streaming to Rclone: {fs}/{dir}/{targetFileName}");
                         
-                        // Important: Use HttpCompletionOption.ResponseHeadersRead to avoid buffering response, 
-                        // but here we are sending *request* body. HttpClient usually streams request bodies by default when using StreamContent.
-                        var response = await _rclone.Client.PostAsync(url, content);
-
-                        if (!response.IsSuccessStatusCode)
-                        {
-                             var error = await response.Content.ReadAsStringAsync();
-                             Console.WriteLine($"Rclone error: {response.StatusCode} - {error}");
-                             return StatusCode((int)response.StatusCode, error);
-                        }
+                        // Delegate to RcloneService
+                        await _rclone.UploadToRemoteAsync(fs, dir, targetFileName, stream, contentType);
                         
                         Console.WriteLine("Streaming upload successful");
                         return Ok();
                     }
                 }
 
-                // Drain any remaining section body (if not the file we wanted, or if we processed it)
-                // Actually if we found the file and returned Ok, we don't need to drain.
-                // But if we continue looking:
                 section = await reader.ReadNextSectionAsync();
             }
 

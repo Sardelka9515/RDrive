@@ -23,9 +23,60 @@ public class RcloneService
         var authToken = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_options.User}:{_options.Password}"));
         _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
     }
+    
+    public async Task<HttpResponseMessage> DownloadFileAsync(string fs, string remote, string? range = null)
+    {
+        remote = remote.TrimStart('/');
+        var url = $"[{fs}]/{remote}"; // Rclone RC VFS syntax
+
+        var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (!string.IsNullOrEmpty(range))
+        {
+            request.Headers.Add("Range", range);
+        }
+
+        var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        // We do NOT call EnsureSuccessStatusCode here because the caller might want to handle 404 or 416 (Range Not Satisfiable)
+        return response;
+    }
+
+    public async Task UploadToRemoteAsync(string fs, string remoteDir, string fileName, Stream content, string? contentType = null)
+    {
+        // Use query parameters for fs and remote to ensure Rclone handles them correctly/immediately
+        // and to match the previously working implementation in FilesController.
+        // Also ensure form key is "file".
+        
+        var url = $"operations/uploadfile?fs={Uri.EscapeDataString(fs)}&remote={Uri.EscapeDataString(remoteDir)}";
+        
+        using var formData = new MultipartFormDataContent();
+        
+        var streamContent = new StreamContent(content);
+        if (!string.IsNullOrEmpty(contentType))
+        {
+            if (MediaTypeHeaderValue.TryParse(contentType, out var mt))
+            {
+                streamContent.Headers.ContentType = mt;
+            }
+        }
+        
+        formData.Add(streamContent, "file", fileName);
+        
+        // Important: Rclone might return an error structure if 200 OK is not returned.
+        var response = await _http.PostAsync(url, formData);
+        
+        if (!response.IsSuccessStatusCode)
+        {
+             var error = await response.Content.ReadAsStringAsync();
+             throw new Exception($"Rclone upload failed: {response.StatusCode} - {error}");
+        }
+    }
 
     public async Task<List<RcloneFileItem>> ListFilesAsync(string fs, string remote)
     {
+        if (!fs.EndsWith(':'))
+        {
+            throw new ArgumentException("fs should end with ':'", nameof(fs));
+        }
         var payload = new
         {
             fs = fs,
@@ -258,62 +309,20 @@ public class RcloneService
         return result ?? new Dictionary<string, Dictionary<string, string>>();
     }
 
+    // Deprecated/Legacy wrappers
     public async Task<Stream> GetFileStreamAsync(string fs, string remote)
     {
-        // When --rc-serve is enabled, files are available at [url]/[fs]/[remote]
-        // properly escape the path
-        var url = $"[{fs}]/{remote}"; // Rclone RC syntax for VFS
-        // Actually, for VFS via RC, it is usually just mapped to the root if mounted? 
-        // No, with rcd --rc-serve, it serves under the root but formatted as [fs]/path
-        // Let's try [fs]/path
-        
-        var response = await _http.GetAsync($"{Uri.EscapeDataString(fs)}/{remote}");
-        if (!response.IsSuccessStatusCode)
-        {
-             // Try simplified path if the above fails? 
-             // Rclone docs say: / acts as the root of the checking. 
-             // accessing /REMOTE/PATH
-             // So we need to ensure fs is strictly the remote name + :
-             // But fs can be a local path too.
-        }
+        var response = await DownloadFileAsync(fs, remote);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadAsStreamAsync();
     }
 
-    public async Task UploadFileStreamAsync(string fs, string remote, Stream content, string contentType)
+    public async Task UploadFileStreamAsync(string fs, string remotePath, Stream content, string contentType)
     {
-        // Upload via operations/uploadfile? No, that expects multipart form data usually.
-        // Or direct PUT to the served URL?
-        // --rc-serve allows PUT/POST to upload?
-        // Rclone docs for `rcd --rc-serve`: "Allows serving files from remotes over HTTP... HEAD, GET and POST are supported."
-        // POST to a directory URL with multipart/form-data uploads a file.
-        // PUT to a file URL uploads the file body?
-        // Documentation is sparse, but usually POST is for operations.
-        // Let's use operations/uploadfile endpoint which is standard RC.
-        
-        // Wait, operations/uploadfile takes inputs as multipart.
-        // Let's implement using MultipartFormDataContent.
-        
-        using var formData = new MultipartFormDataContent();
-        formData.Add(new StringContent(fs), "fs");
-        formData.Add(new StringContent(remote), "remote");
-        
-        // We need to provide the file content. 
-        // Rclone operations/uploadfile defined as: 
-        // Parameters: fs, remote
-        // File Upload: file1=...
-        
-        var fileContent = new StreamContent(content);
-        fileContent.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-        formData.Add(fileContent, "file1", Path.GetFileName(remote)); // Name matches parameter expected? "file1" is common.
-                                                                      // Actually typically it just takes the files in the multipart.
-        
-        var response = await _http.PostAsync("operations/uploadfile", formData);
-        if (!response.IsSuccessStatusCode)
-        {
-             var error = await response.Content.ReadAsStringAsync();
-             throw new Exception($"Rclone upload failed: {error}");
-        }
+         // Legacy adapter: remotePath is full path including filename
+         var dir = Path.GetDirectoryName(remotePath)?.Replace("\\", "/") ?? "";
+         var filename = Path.GetFileName(remotePath);
+         await UploadToRemoteAsync(fs, dir, filename, content, contentType);
     }
     
     // Helper to get raw HttpClient for streaming if needed, or expose specific methods

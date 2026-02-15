@@ -34,8 +34,9 @@ public class PublicSharesControllerTests
         
         var rcloneOptions = Options.Create(new RcloneOptions { Address = "http://test-rclone", User = "u", Password = "p" });
         var rcloneService = new RcloneService(httpClient, rcloneOptions);
+        var resolver = new RclonePathResolver(rcloneService);
         
-        _controller = new PublicSharesController(_db, rcloneService);
+        _controller = new PublicSharesController(_db, rcloneService, resolver);
         _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() };
     }
 
@@ -133,7 +134,9 @@ public class PublicSharesControllerTests
         _httpHandlerMock.Protected()
             .Setup<Task<HttpResponseMessage>>(
                 "SendAsync",
-                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.Is<HttpRequestMessage>(req => req.RequestUri != null && 
+                    (req.RequestUri.ToString().Contains("[myremote:]/data/file.txt") || 
+                     req.RequestUri.ToString().Contains("%5Bmyremote:%5D/data/file.txt"))),
                 ItExpr.IsAny<CancellationToken>()
             )
             .ReturnsAsync(new HttpResponseMessage
@@ -148,5 +151,44 @@ public class PublicSharesControllerTests
         using var reader = new StreamReader(fileResult.FileStream);
         var content = await reader.ReadToEndAsync();
         Assert.Equal(fileContent, content);
+    }
+    [Fact]
+    public async Task UploadFile_ReturnsOk_WhenAuthorizedAndWriteable()
+    {
+        var share = new Share { Id = Guid.NewGuid(), Remote = "myremote:", Path = "data", IsPublic = true };
+        var recipient = new ShareRecipient { Email = "test@example.com", Permission = "Write", ShareId = share.Id };
+        share.Recipients.Add(recipient);
+        _db.Shares.Add(share);
+        await _db.SaveChangesAsync();
+
+        // Simulate authorized user
+        var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[] {
+            new Claim(ClaimTypes.Email, "test@example.com")
+        }, "TestAuth"));
+        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
+
+        // Mock Rclone Upload response
+        _httpHandlerMock.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.Is<HttpRequestMessage>(req => req.Method == HttpMethod.Post && req.RequestUri.ToString().Contains("operations/uploadfile")),
+                ItExpr.IsAny<CancellationToken>()
+            )
+            .ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = HttpStatusCode.OK
+            });
+
+        var content = "File Content";
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
+        var file = new FormFile(stream, 0, stream.Length, "file", "test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var result = await _controller.UploadFile(share.Id, "test.txt", file);
+
+        Assert.IsType<OkResult>(result);
     }
 }

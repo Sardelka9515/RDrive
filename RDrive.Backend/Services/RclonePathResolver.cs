@@ -32,6 +32,7 @@ public class RclonePathResolver
     
     public Task<string> GetFsForRemoteAsync(string remoteName)
     {
+         if (remoteName.EndsWith(":")) return Task.FromResult(remoteName);
          return Task.FromResult($"{remoteName}:");
     }
 }

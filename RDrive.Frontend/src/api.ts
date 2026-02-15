@@ -79,6 +79,58 @@ export interface Provider {
     Options: ProviderOption[];
 }
 
+export interface ShareRecipient {
+    email: string;
+    permission: string; // "Read" | "Write"
+}
+
+export interface ShareResponse {
+    id: string;
+    remote: string;
+    path: string;
+    name: string;
+    description: string;
+    hasPassword: boolean;
+    creator: string;
+    createdAt: string;
+    expiration: string | null;
+    views: number;
+    maxDownloads: number;
+    isPublic: boolean;
+    recipients?: ShareRecipient[];
+}
+
+export interface CreateShareRequest {
+    remote: string;
+    path: string;
+    name: string;
+    description: string;
+    password?: string;
+    expiration?: string;
+    maxDownloads: number;
+    isPublic: boolean;
+    recipients: ShareRecipient[];
+}
+
+export interface UpdateShareRequest {
+    name: string;
+    description: string;
+    password?: string;
+    expiration?: string;
+    maxDownloads: number;
+    isPublic: boolean;
+    recipients: ShareRecipient[];
+}
+
+export interface PublicShareInfo {
+    id: string;
+    name: string;
+    description: string;
+    hasPassword: boolean;
+    writeable: boolean;
+    expiration: string | null;
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 // Token getter, set by AuthProvider
@@ -347,5 +399,93 @@ export const api = {
         const res = await authFetch(`${API_BASE}/remotes/dump`);
         if (!res.ok) throw new Error('Failed to dump config');
         return res.json();
-    }
+    },
+
+    // Shares management (authenticated)
+    getShares: async (): Promise<ShareResponse[]> => {
+        const res = await authFetch(`${API_BASE}/shares`);
+        if (!res.ok) throw new Error('Failed to fetch shares');
+        return res.json();
+    },
+
+    getShare: async (id: string): Promise<ShareResponse> => {
+        const res = await authFetch(`${API_BASE}/shares/${id}`);
+        if (!res.ok) throw new Error('Failed to fetch share');
+        return res.json();
+    },
+
+    createShare: async (request: CreateShareRequest): Promise<ShareResponse> => {
+        const res = await authFetch(`${API_BASE}/shares`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to create share');
+        }
+        return res.json();
+    },
+
+    updateShare: async (id: string, request: UpdateShareRequest): Promise<ShareResponse> => {
+        const res = await authFetch(`${API_BASE}/shares/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to update share');
+        }
+        return res.json();
+    },
+
+    deleteShare: async (id: string): Promise<void> => {
+        const res = await authFetch(`${API_BASE}/shares/${id}`, { method: 'DELETE' });
+        if (!res.ok) throw new Error('Failed to delete share');
+    },
+
+    // Public share access (no auth required)
+    getPublicShareInfo: async (id: string): Promise<PublicShareInfo> => {
+        const res = await fetch(`${API_BASE}/p/shares/${id}/info`);
+        if (!res.ok) throw new Error('Share not found or expired');
+        return res.json();
+    },
+
+    authenticateShare: async (id: string, password: string): Promise<string> => {
+        const res = await fetch(`${API_BASE}/p/shares/${id}/auth`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        if (!res.ok) throw new Error('Invalid password');
+        const data = await res.json();
+        return data.token;
+    },
+
+    listShareFiles: async (id: string, path: string = '', token?: string): Promise<FileItem[]> => {
+        const headers: Record<string, string> = {};
+        if (token) headers['X-Share-Token'] = token;
+        const cleanPath = path ? path : '';
+        const url = cleanPath ? `${API_BASE}/p/shares/${id}/files/${cleanPath}` : `${API_BASE}/p/shares/${id}/files`;
+        const res = await fetch(url, { headers });
+        if (!res.ok) throw new Error('Failed to list share files');
+        return res.json();
+    },
+
+    downloadShareFile: async (id: string, path: string, fileName: string, token?: string): Promise<void> => {
+        const headers: Record<string, string> = {};
+        if (token) headers['X-Share-Token'] = token;
+        const res = await fetch(`${API_BASE}/p/shares/${id}/download/${path}`, { headers });
+        if (!res.ok) throw new Error('Failed to download file');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    },
 };
