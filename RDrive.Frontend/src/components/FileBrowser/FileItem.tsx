@@ -50,43 +50,47 @@ export function FileItem({
             onDragLeave={file.IsDir && onDragLeave ? onDragLeave : undefined}
             onDrop={file.IsDir && onDrop ? (e => onDrop(e, folderPath)) : undefined}
             className={`
-                group cursor-pointer rounded-lg border p-4 transition-all select-none
+                group cursor-pointer rounded-xl border p-4 transition-all duration-200 select-none
                 ${isSelected
-                    ? 'bg-blue-50 dark:bg-blue-900/30 border-blue-500 shadow-md ring-1 ring-blue-500'
-                    : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:shadow hover:border-blue-300'}
+                    ? 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 border-blue-500 dark:border-blue-600 shadow-lg ring-2 ring-blue-500/50 dark:ring-blue-400/50 scale-[1.02]'
+                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 hover:scale-[1.01]'}
                 ${isDragging ? 'opacity-40' : ''}
-                ${isDropTarget ? 'ring-2 ring-blue-400 border-blue-400 bg-blue-50 dark:bg-blue-900/20 scale-[1.02]' : ''}
+                ${isDropTarget ? 'ring-4 ring-blue-400 border-blue-400 dark:border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-[1.03] shadow-xl' : ''}
                 ${viewMode === 'list' ? 'flex items-center justify-between' : 'flex flex-col items-center text-center'}
             `}
         >
             <div className={`flex ${viewMode === 'list' ? 'items-center gap-4 flex-grow' : 'flex-col items-center gap-2'} min-w-0 w-full`}>
-                <div className="text-4xl text-blue-500 flex-shrink-0">
+                <div className={`flex-shrink-0 ${file.IsDir ? 'text-blue-500' : 'text-gray-400'}`}>
                     {file.IsDir ? (
-                        <svg className="w-10 h-10" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-                        </svg>
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+                            <svg className="w-7 h-7" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
+                            </svg>
+                        </div>
                     ) : (
-                        <svg className="w-10 h-10 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
-                        </svg>
+                        <div className="w-12 h-12 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-xl flex items-center justify-center shadow-md">
+                            <svg className="w-7 h-7 text-gray-500 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                            </svg>
+                        </div>
                     )}
                 </div>
                 <div className="min-w-0 w-full overflow-hidden">
-                    <p className="font-medium text-gray-700 dark:text-gray-200 break-words line-clamp-2" title={file.Name}>
+                    <p className="font-semibold text-gray-800 dark:text-gray-100 break-words line-clamp-2" title={file.Name}>
                         {file.Name}
                     </p>
                     {viewMode === 'grid' && (
                         <>
-                            <p className="text-xs text-gray-400 mt-1">{formatSize(file.Size)}</p>
-                            <p className="text-xs text-gray-400">{formatDate(file.ModTime)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 font-medium">{formatSize(file.Size)}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{formatDate(file.ModTime)}</p>
                         </>
                     )}
                 </div>
             </div>
             {viewMode === 'list' && (
                 <div className="flex items-center gap-8 flex-shrink-0 ml-4 hidden md:flex">
-                    <div className="text-sm text-gray-500 w-40 text-right">{formatDate(file.ModTime)}</div>
-                    <div className="text-sm text-gray-500 w-20 text-right">{formatSize(file.Size)}</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400 w-40 text-right font-medium">{formatDate(file.ModTime)}</div>
+                    <div className="text-sm text-gray-600 dark:text-gray-300 w-20 text-right font-semibold">{formatSize(file.Size)}</div>
                 </div>
             )}
         </div>

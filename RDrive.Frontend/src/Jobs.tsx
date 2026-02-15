@@ -129,26 +129,27 @@ export default function Jobs() {
     return (
         <div>
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white">Jobs</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">Jobs</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                         {runningCount > 0 || queuedCount > 0
                             ? `${runningCount} running${queuedCount > 0 ? ` · ${queuedCount} queued` : ''} · ${tasks.length} total`
-                            : `${tasks.length} total`}
+                            : `${tasks.length} total jobs`}
                     </p>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={loadTasks}
-                        className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm transition"
+                        className="btn-secondary text-sm flex items-center gap-2"
                     >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         Refresh
                     </button>
                     {tasks.some(t => t.status !== 'Running' && t.status !== 'Pending') && (
                         <button
                             onClick={handleClearCompleted}
-                            className="px-4 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-sm transition text-red-600 dark:text-red-400"
+                            className="btn-danger text-sm"
                         >
                             Clear Finished
                         </button>
@@ -159,17 +160,23 @@ export default function Jobs() {
             {/* Content */}
             {loading ? (
                 <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="relative">
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 dark:border-gray-700"></div>
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent absolute top-0 left-0"></div>
+                    </div>
                 </div>
             ) : tasks.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow min-h-[300px] flex items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700">
-                    <div className="text-center">
-                        <p className="text-xl text-gray-400">No jobs yet</p>
-                        <p className="text-sm text-gray-500 mt-2">Copy, move, and sync operations will appear here.</p>
+                <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl shadow-sm min-h-[400px] flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+                    <div className="text-center p-8">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full flex items-center justify-center">
+                            <svg className="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        </div>
+                        <p className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">No jobs yet</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">Copy, move, and sync operations will appear here</p>
                     </div>
                 </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                     {tasks.map(task => {
                         const stats = task.stats;
                         const progressPercent = stats && stats.totalBytes > 0
@@ -181,20 +188,20 @@ export default function Jobs() {
                         return (
                             <div
                                 key={task.id}
-                                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700 p-4 shadow-sm hover:shadow transition"
+                                className="card-elevated p-5 hover:shadow-lg group"
                             >
                                 <div className="flex items-start justify-between gap-4">
                                     {/* Left side */}
-                                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                                        <span className="text-2xl flex-shrink-0 mt-0.5">
+                                    <div className="flex items-start gap-4 min-w-0 flex-1">
+                                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 flex items-center justify-center text-white text-2xl shadow-lg shadow-blue-500/30 flex-shrink-0">
                                             {TYPE_ICONS[task.type] || '📄'}
-                                        </span>
+                                        </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-semibold text-gray-800 dark:text-white">
+                                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                <span className="font-bold text-gray-800 dark:text-white text-lg">
                                                     {task.type}
                                                 </span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[task.status] || STATUS_COLORS.Unknown}`}>
+                                                <span className={`badge ${STATUS_COLORS[task.status] || STATUS_COLORS.Unknown}`}>
                                                     {task.status}
                                                     {task.status === 'Running' && (
                                                         <span className="ml-1 inline-block animate-pulse">●</span>
@@ -204,14 +211,14 @@ export default function Jobs() {
                                                     )}
                                                 </span>
                                             </div>
-                                            <div className="mt-1 text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
-                                                <div className="flex items-center gap-1 min-w-0">
-                                                    <span className="text-gray-400 flex-shrink-0">From:</span>
-                                                    <span className="truncate font-mono text-xs">{task.sourceRemote}:{task.sourcePath}</span>
+                                            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                                    <span className="truncate font-mono text-xs bg-gray-100 dark:bg-gray-700/70 px-2 py-0.5 rounded">{task.sourceRemote}:{task.sourcePath}</span>
                                                 </div>
-                                                <div className="flex items-center gap-1 min-w-0">
-                                                    <span className="text-gray-400 flex-shrink-0">To:</span>
-                                                    <span className="truncate font-mono text-xs">{task.destRemote}:{task.destPath}</span>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10"/></svg>
+                                                    <span className="truncate font-mono text-xs bg-gray-100 dark:bg-gray-700/70 px-2 py-0.5 rounded">{task.destRemote}:{task.destPath}</span>
                                                 </div>
                                             </div>
 
@@ -220,45 +227,63 @@ export default function Jobs() {
                                                 <div className="mt-3 space-y-2">
                                                     {/* Progress bar */}
                                                     {progressPercent != null && (
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex-1 h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden shadow-inner">
                                                                 <div
-                                                                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                                                                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-500 shadow-sm"
                                                                     style={{ width: `${progressPercent}%` }}
                                                                 />
                                                             </div>
-                                                            <span className="text-xs font-medium text-blue-600 dark:text-blue-400 w-10 text-right">{progressPercent}%</span>
+                                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400 w-12 text-right">{progressPercent}%</span>
                                                         </div>
                                                     )}
 
                                                     {/* Stats grid */}
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-1 text-xs">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-gray-400">Speed:</span>
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{formatSpeed(stats.speed)}</span>
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                                                        <div className="flex items-center gap-2">
+                                                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                                            <div>
+                                                                <div className="text-gray-400">Speed</div>
+                                                                <div className="font-bold text-gray-700 dark:text-gray-200">{formatSpeed(stats.speed)}</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-gray-400">Transferred:</span>
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{formatBytes(stats.bytes)}{stats.totalBytes > 0 ? ` / ${formatBytes(stats.totalBytes)}` : ''}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                                                            <div>
+                                                                <div className="text-gray-400">Transferred</div>
+                                                                <div className="font-bold text-gray-700 dark:text-gray-200">{formatBytes(stats.bytes)}{stats.totalBytes > 0 ? ` / ${formatBytes(stats.totalBytes)}` : ''}</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-gray-400">Files:</span>
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{stats.transfers}{stats.totalTransfers > 0 ? ` / ${stats.totalTransfers}` : ''}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                                            <div>
+                                                                <div className="text-gray-400">Files</div>
+                                                                <div className="font-bold text-gray-700 dark:text-gray-200">{stats.transfers}{stats.totalTransfers > 0 ? ` / ${stats.totalTransfers}` : ''}</div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5">
-                                                            <span className="text-gray-400">ETA:</span>
-                                                            <span className="font-medium text-gray-700 dark:text-gray-300">{formatEta(stats.eta)}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <svg className="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                            <div>
+                                                                <div className="text-gray-400">ETA</div>
+                                                                <div className="font-bold text-gray-700 dark:text-gray-200">{formatEta(stats.eta)}</div>
+                                                            </div>
                                                         </div>
                                                         {stats.errors > 0 && (
-                                                            <div className="flex items-center gap-1.5 col-span-2">
-                                                                <span className="text-red-400">Errors:</span>
-                                                                <span className="font-medium text-red-600 dark:text-red-400">{stats.errors}</span>
+                                                            <div className="flex items-center gap-2 col-span-2">
+                                                                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                                <div>
+                                                                    <div className="text-red-400">Errors</div>
+                                                                    <div className="font-bold text-red-600 dark:text-red-400">{stats.errors}</div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                         {stats.checks > 0 && (
-                                                            <div className="flex items-center gap-1.5">
-                                                                <span className="text-gray-400">Checks:</span>
-                                                                <span className="font-medium text-gray-700 dark:text-gray-300">{stats.checks}{stats.totalChecks > 0 ? ` / ${stats.totalChecks}` : ''}</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                                <div>
+                                                                    <div className="text-gray-400">Checks</div>
+                                                                    <div className="font-bold text-gray-700 dark:text-gray-300">{stats.checks}{stats.totalChecks > 0 ? ` / ${stats.totalChecks}` : ''}</div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
@@ -283,11 +308,14 @@ export default function Jobs() {
                                             )}
 
                                             {task.error && (
-                                                <div className="mt-2 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded px-2 py-1">
-                                                    {task.error}
+                                                <div className="mt-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 border border-red-200 dark:border-red-800">
+                                                    <div className="flex items-center gap-2">
+                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        <span>{task.error}</span>
+                                                    </div>
                                                 </div>
                                             )}
-                                            <div className="mt-2 flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500">
+                                            <div className="mt-3 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                                                 <span>Created: {formatTime(task.createdAt)}</span>
                                                 {task.startedAt && <span>Started: {formatTime(task.startedAt)}</span>}
                                                 {task.startedAt && <span>Duration: {formatDuration(task.startedAt, task.finishedAt)}</span>}
@@ -296,11 +324,11 @@ export default function Jobs() {
                                     </div>
 
                                     {/* Right side - actions */}
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex items-start gap-2 flex-shrink-0">
                                         {(task.status === 'Running' || task.status === 'Queued') && (
                                             <button
                                                 onClick={() => handleStop(task.id)}
-                                                className="px-3 py-1.5 text-sm bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-800 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/40 transition"
+                                                className="px-4 py-2 text-sm bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-700 rounded-lg hover:bg-yellow-100 dark:hover:bg-yellow-900/50 transition-all font-medium shadow-sm"
                                             >
                                                 Stop
                                             </button>
@@ -308,7 +336,7 @@ export default function Jobs() {
                                         {(task.status === 'Stopped' || task.status === 'Failed' || task.status === 'Unknown') && (
                                             <button
                                                 onClick={() => handleRestart(task.id)}
-                                                className="px-3 py-1.5 text-sm bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition"
+                                                className="px-4 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium shadow-sm"
                                             >
                                                 Restart
                                             </button>
@@ -316,7 +344,7 @@ export default function Jobs() {
                                         {task.status !== 'Running' && task.status !== 'Queued' && (
                                             <button
                                                 onClick={() => handleDelete(task.id)}
-                                                className="px-3 py-1.5 text-sm bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-800 transition"
+                                                className="px-4 py-2 text-sm bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 hover:border-red-200 dark:hover:border-red-700 transition-all font-medium shadow-sm"
                                             >
                                                 Remove
                                             </button>

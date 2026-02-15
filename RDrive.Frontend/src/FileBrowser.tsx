@@ -218,11 +218,11 @@ export default function FileBrowser() {
         >
             {/* Header */}
             <div
-                className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"
+                className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
                 onClick={e => e.stopPropagation()}
             >
                 <div>
-                    <h2 className="text-2xl font-bold text-gray-800 dark:text-white capitalize">
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-400 dark:to-blue-500 bg-clip-text text-transparent capitalize">
                         {remoteName}
                     </h2>
                     <Breadcrumbs
@@ -252,7 +252,10 @@ export default function FileBrowser() {
             {/* Files Area */}
             {loading ? (
                 <div className="flex justify-center items-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <div className="relative">
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 dark:border-gray-700"></div>
+                        <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-600 border-t-transparent absolute top-0 left-0"></div>
+                    </div>
                 </div>
             ) : (
                 <FileGrid

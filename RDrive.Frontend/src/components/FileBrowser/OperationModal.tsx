@@ -40,24 +40,28 @@ export function OperationModal({
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in"
             onClick={onClose}
         >
             <div
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6"
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-gray-700"
                 onClick={e => e.stopPropagation()}
             >
-                <h3 className="text-xl font-bold mb-4 capitalize">
-                    {type}{' '}
-                    {files.length === 1
-                        ? `"${files[0].Name}"`
-                        : `${files.length} items`}
-                </h3>
+                <div className="p-6 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20 dark:to-transparent">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white capitalize">
+                        {type}{' '}
+                        {files.length === 1
+                            ? `"${files[0].Name}"`
+                            : `${files.length} items`}
+                    </h3>
+                </div>
+
+                <div className="p-6 space-y-4">
 
                 <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">Destination Remote</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Destination Remote</label>
                     <select
-                        className="w-full border rounded p-2 dark:bg-gray-700"
+                        className="input-field"
                         value={dstRemote}
                         onChange={e => setDstRemote(e.target.value)}
                     >
@@ -67,12 +71,12 @@ export function OperationModal({
                 </div>
 
                 <div className="mb-4">
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         {files.length === 1 ? 'Destination Path' : 'Destination Folder'}
                     </label>
                     <input
                         type="text"
-                        className="w-full border rounded p-2 dark:bg-gray-700"
+                        className="input-field"
                         value={dstPath}
                         onChange={e => setDstPath(e.target.value)}
                         placeholder={files.length === 1 ? 'folder/filename.ext' : 'folder/subfolder'}
@@ -85,35 +89,38 @@ export function OperationModal({
                 </div>
 
                 {files.length > 1 && (
-                    <div className="mb-4 max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-900 rounded-lg p-3 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="max-h-32 overflow-y-auto bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 text-sm text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
                         {files.map(f => (
-                            <div key={f.Name} className="flex items-center gap-2 py-0.5">
+                            <div key={f.Name} className="flex items-center gap-2 py-1">
                                 {f.IsDir ? (
-                                    <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                                    </svg>
+                                    <div className="w-5 h-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+                                        </svg>
+                                    </div>
                                 ) : (
-                                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                    <svg className="w-5 h-5 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                         <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                                     </svg>
                                 )}
-                                <span className="truncate">{f.Name}</span>
+                                <span className="truncate font-medium">{f.Name}</span>
                             </div>
                         ))}
                     </div>
                 )}
+                </div>
 
-                <div className="flex justify-end gap-2">
+                <div className="p-6 pt-0 flex justify-end gap-3 border-t border-gray-200 dark:border-gray-700">
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                        className="btn-secondary text-sm"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSubmit}
                         disabled={loading || !dstRemote}
-                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                        className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {loading ? 'Processing...' : type === 'copy' ? 'Copy' : type === 'move' ? 'Move' : 'Sync'}
                     </button>

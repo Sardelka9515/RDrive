@@ -36,8 +36,14 @@ export function FileGrid({
 }: FileGridProps) {
     if (files.length === 0) {
         return (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow min-h-[300px] flex items-center justify-center border-2 border-dashed border-gray-200">
-                <p className="text-gray-400">Folder is empty</p>
+            <div className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm rounded-2xl shadow-sm min-h-[400px] flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+                <div className="text-center p-8">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 rounded-full flex items-center justify-center">
+                        <svg className="w-10 h-10 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                    </div>
+                    <p className="text-xl font-semibold text-gray-600 dark:text-gray-300 mb-2">Folder is empty</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Upload files or create folders to get started</p>
+                </div>
             </div>
         );
     }
