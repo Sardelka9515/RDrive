@@ -1,65 +1,12 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, Link, useLocation } from 'react-router-dom';
 import FileBrowser from './FileBrowser';
 import Jobs from './Jobs';
 import RemoteConfig from './RemoteConfig';
 import { api } from './api';
 import { ToastProvider, useToast } from './Toast';
-import { AuthProvider, useAuth } from './Auth';
+import { AuthProvider, useAuth, CallbackPage, LoginPage } from './Auth';
 import './index.css';
-
-function CallbackHandler() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      const returnUrl = sessionStorage.getItem('rdrive_return_url') || '/';
-      sessionStorage.removeItem('rdrive_return_url');
-      navigate(returnUrl, { replace: true });
-    }
-  }, [isLoading, isAuthenticated, navigate]);
-
-  // Already authenticated (e.g. page refresh) — redirect immediately
-  if (!isLoading && isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  // Not authenticated after loading — go to login
-  if (!isLoading && !isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-      <div className="text-gray-500 dark:text-gray-400">Signing in...</div>
-    </div>
-  );
-}
-
-function LoginPage() {
-  const { login, isLoading, isAuthenticated } = useAuth();
-
-  if (!isLoading && isAuthenticated) {
-    return <Navigate to="/" replace />;
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">RDrive</h1>
-        <h2 className="text-xl text-gray-600 dark:text-gray-400 mb-8">Sign in to continue</h2>
-        <button
-          onClick={login}
-          disabled={isLoading}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50"
-        >
-          Sign in with SSO
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function PrivateLayout() {
   const { isAuthenticated, isLoading, accessDenied, userName, logout } = useAuth();
@@ -216,7 +163,7 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/callback" element={<CallbackHandler />} />
+            <Route path="/callback" element={<CallbackPage />} />
 
             <Route element={<PrivateLayout />}>
               <Route path="/" element={<Dashboard />} />
