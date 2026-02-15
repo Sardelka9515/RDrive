@@ -30,11 +30,39 @@ public class Share
 {
     public Guid Id { get; set; }
     
-    public int SpaceId { get; set; }
+    public string Remote { get; set; } = string.Empty;
     
     public string Path { get; set; } = string.Empty;
+
+    public string Name { get; set; } = string.Empty;
+
+    public string Description { get; set; } = string.Empty;
     
-    public DateTime? Expiration { get; set; }
+    public string? Password { get; set; } // Hashed or plain (simple for now per plan)
+
+    public string Creator { get; set; } = string.Empty; // User ID/Email
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? Expiration { get; set; } // Renamed from ExpiresAt in plan to match existing Expiration or vice versa? Plan said ExpiresAt but existing was Expiration. Let's stick to Expiration to match existing.
+
+    public int Views { get; set; }
+
+    public int MaxDownloads { get; set; } // 0 = unlimited
     
     public bool IsPublic { get; set; }
+
+    public List<ShareRecipient> Recipients { get; set; } = new();
+}
+
+public class ShareRecipient
+{
+    public Guid Id { get; set; }
+    
+    public Guid ShareId { get; set; }
+    public Share Share { get; set; } = null!; // Navigation property
+    
+    public string Email { get; set; } = string.Empty;
+    
+    public string Permission { get; set; } = "Read"; // Read, Write
 }

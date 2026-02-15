@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
     public DbSet<RTask> Tasks { get; set; }
     public DbSet<Share> Shares { get; set; }
+    public DbSet<ShareRecipient> ShareRecipients { get; set; }
     
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

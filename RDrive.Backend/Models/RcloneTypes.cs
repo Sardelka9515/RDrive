@@ -68,7 +68,7 @@ public class RcloneJobStatusResponse
     public bool Success { get; set; }
     
     [JsonPropertyName("output")]
-    public object Output { get; set; }
+    public object? Output { get; set; }
 }
 
 public class RcloneStatsResponse
