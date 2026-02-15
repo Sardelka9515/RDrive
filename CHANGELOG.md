@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/Sardelka9515/RDrive/compare/v0.2.0...v0.3.0) (2026-02-15)
+
+
+### Features
+
+* Add Public Shares api with unit tests ([c08ce52](https://github.com/Sardelka9515/RDrive/commit/c08ce52a9ec2f563f88743d8341cb80bd71c51fc))
+* add ShareBrowser and Shares components for managing and accessing shared files ([4391838](https://github.com/Sardelka9515/RDrive/commit/4391838666cf7228bfb6a87d472404097941a18a))
+
+
+### Bug Fixes
+
+* correct recipient length check and share ID reference in Shares component ([b012949](https://github.com/Sardelka9515/RDrive/commit/b0129493052a665f9d4f52c8e09ea0067e11a431))
+* enhance release workflow with Docker integration and metadata extraction ([baeca6f](https://github.com/Sardelka9515/RDrive/commit/baeca6f1a3e5a3f3f79a089d34a5ec93d28897fe))
+
 ## [0.2.0](https://github.com/Sardelka9515/RDrive/compare/v0.1.0...v0.2.0) (2026-02-15)
 
 
