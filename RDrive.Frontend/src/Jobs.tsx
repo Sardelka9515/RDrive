@@ -216,14 +216,14 @@ export default function Jobs() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">Jobs</h2>
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-1">Jobs</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                         {runningCount > 0 || queuedCount > 0
                             ? `${runningCount} running${queuedCount > 0 ? ` · ${queuedCount} queued` : ''} · ${tasks.length} total`
                             : `${tasks.length} total jobs`}
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                     <button
                         onClick={openNewSchedule}
                         className="btn-primary text-sm flex items-center gap-2"
@@ -256,7 +256,7 @@ export default function Jobs() {
                     <div className="space-y-3">
                         {scheduled.map(job => (
                             <div key={job.id} className={`card-elevated p-4 ${job.enabled ? '' : 'opacity-60'}`}>
-                                <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
                                         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-md flex-shrink-0">
                                             {TYPE_ICONS[job.type] || '📄'}
@@ -278,7 +278,7 @@ export default function Jobs() {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                    <div className="flex items-center gap-2 flex-wrap flex-shrink-0">
                                         <button onClick={() => handleRunNow(job.id)} className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium">Run now</button>
                                         <button onClick={() => handleToggleSchedule(job.id)} className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all font-medium">{job.enabled ? 'Disable' : 'Enable'}</button>
                                         <button onClick={() => openEditSchedule(job)} className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all font-medium">Edit</button>
@@ -322,9 +322,9 @@ export default function Jobs() {
                         return (
                             <div
                                 key={task.id}
-                                className="card-elevated p-5 hover:shadow-lg group"
+                                className="card-elevated p-4 md:p-5 hover:shadow-lg group"
                             >
-                                <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                                     {/* Left side */}
                                     <div className="flex items-start gap-4 min-w-0 flex-1">
                                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 flex items-center justify-center text-white text-2xl shadow-lg shadow-blue-500/30 flex-shrink-0">
@@ -467,7 +467,7 @@ export default function Jobs() {
                                     </div>
 
                                     {/* Right side - actions */}
-                                    <div className="flex items-start gap-2 flex-shrink-0">
+                                    <div className="flex items-start gap-2 flex-wrap flex-shrink-0">
                                         <button
                                             onClick={() => scheduleFromTask(task)}
                                             title="Create a recurring schedule from this job"

@@ -350,14 +350,14 @@ export default function Shares() {
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">Shares</h2>
+            <div className="flex justify-between items-start sm:items-center gap-3 mb-8">
+                <div className="min-w-0">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-1">Shares</h2>
                     <p className="text-sm text-gray-500 dark:text-gray-400">Share your files securely with others</p>
                 </div>
                 <button
                     onClick={() => setShowCreate(true)}
-                    className="btn-primary flex items-center gap-2 text-sm"
+                    className="btn-primary flex items-center gap-2 text-sm shrink-0"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
                     New Share

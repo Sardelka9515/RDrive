@@ -13,6 +13,12 @@ import './index.css';
 function PrivateLayout() {
   const { isAuthenticated, isLoading, accessDenied, userName, logout } = useAuth();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Close the mobile drawer whenever the route changes
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   if (isLoading) {
     return (
@@ -62,10 +68,20 @@ function PrivateLayout() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-900 dark:text-gray-100 font-sans">
-      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 dark:border-gray-700/50 p-4 flex justify-between items-center z-10 relative">
-        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-400 dark:to-blue-500 bg-clip-text text-transparent">RDrive</h1>
+      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm border-b border-gray-200/50 dark:border-gray-700/50 p-4 flex justify-between items-center z-30 relative">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(o => !o)}
+            className="md:hidden p-1.5 -ml-1 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition"
+            aria-label="Toggle navigation menu"
+            aria-expanded={sidebarOpen}
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+          </button>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-400 dark:to-blue-500 bg-clip-text text-transparent">RDrive</h1>
+        </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{displayName}</span>
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300 hidden sm:inline">{displayName}</span>
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 rounded-full flex items-center justify-center text-white font-bold shadow-md">{initial}</div>
           {userName && (
             <button
@@ -80,9 +96,22 @@ function PrivateLayout() {
       </header>
 
       <div className="flex">
-        {/* Sidebar - Fixed width */}
-        <div className="w-60 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm shadow-sm h-[calc(100vh-64px)] hidden md:block border-r border-gray-200/70 dark:border-gray-700/70">
-          <nav className="p-4 space-y-1">
+        {/* Backdrop (mobile only) */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 top-16 bg-black/40 z-20 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Sidebar - static on desktop, slide-in drawer on mobile */}
+        <div
+          className={`w-60 bg-white dark:bg-gray-800 md:bg-white/50 md:dark:bg-gray-800/50 backdrop-blur-sm shadow-sm h-[calc(100vh-64px)] border-r border-gray-200/70 dark:border-gray-700/70
+            fixed top-16 left-0 z-30 transform transition-transform duration-200 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            md:static md:top-auto md:translate-x-0`}
+        >
+          <nav className="p-4 space-y-1" onClick={() => setSidebarOpen(false)}>
             <Link to="/" className={linkClass('/')}>
               <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
               My Remotes
@@ -105,7 +134,7 @@ function PrivateLayout() {
         </div>
 
         {/* Main Content */}
-        <main className="flex-1 p-8 overflow-y-auto h-[calc(100vh-64px)] animate-fade-in">
+        <main className="flex-1 min-w-0 p-4 md:p-8 overflow-y-auto h-[calc(100vh-64px)] animate-fade-in">
           <Outlet />
         </main>
       </div>
@@ -129,12 +158,12 @@ function Dashboard() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-1">My Remotes</h2>
+      <div className="flex justify-between items-start sm:items-center gap-3 mb-8">
+        <div className="min-w-0">
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-800 dark:text-white mb-1">My Remotes</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">Manage your cloud storage connections</p>
         </div>
-        <Link to="/config" className="btn-primary flex items-center gap-2">
+        <Link to="/config" className="btn-primary flex items-center gap-2 shrink-0">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
           <span>Add Remote</span>
         </Link>

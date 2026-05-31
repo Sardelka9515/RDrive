@@ -17,13 +17,13 @@ export function SelectionBar({
 
     return (
         <div
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl px-6 py-4 flex items-center gap-4 backdrop-blur-sm animate-slide-in"
+            className="fixed bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[calc(100vw-1rem)] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-2xl px-3 md:px-6 py-3 md:py-4 flex items-center justify-center flex-wrap gap-2 md:gap-4 backdrop-blur-sm animate-slide-in"
             onClick={e => e.stopPropagation()}
         >
-            <span className="text-sm font-bold text-gray-800 dark:text-gray-100">
-                {count} items selected
+            <span className="text-sm font-bold text-gray-800 dark:text-gray-100 whitespace-nowrap">
+                {count} selected
             </span>
-            <div className="h-6 w-px bg-gray-300 dark:border-gray-600" />
+            <div className="h-6 w-px bg-gray-300 dark:border-gray-600 hidden md:block" />
             <button
                 onClick={onCopy}
                 className="px-4 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium shadow-sm"

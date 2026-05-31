@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import type { FileItem as FileItemType } from '../../api';
 
 interface ContextMenuProps {
@@ -32,10 +33,25 @@ export function ContextMenu({
     hasFiles,
     currentFolderName,
 }: ContextMenuProps) {
+    const menuRef = useRef<HTMLDivElement>(null);
+    const [pos, setPos] = useState({ top: y, left: x });
+
+    // Clamp the menu within the viewport so it never opens off-screen.
+    useLayoutEffect(() => {
+        const el = menuRef.current;
+        if (!el) return;
+        const { width, height } = el.getBoundingClientRect();
+        const margin = 8;
+        const left = Math.max(margin, Math.min(x, window.innerWidth - width - margin));
+        const top = Math.max(margin, Math.min(y, window.innerHeight - height - margin));
+        setPos({ top, left });
+    }, [x, y, files.length]);
+
     return (
         <div
+            ref={menuRef}
             className="fixed z-50 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl py-2 w-56 text-sm text-gray-700 dark:text-gray-200 animate-fade-in"
-            style={{ top: y, left: x }}
+            style={{ top: pos.top, left: pos.left }}
             onClick={e => e.stopPropagation()}
         >
             {files.length > 0 ? (
