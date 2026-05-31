@@ -290,28 +290,37 @@ export default function Jobs() {
 
                                                     {/* Currently transferring files */}
                                                     {stats.transferring && stats.transferring.length > 0 && (
-                                                        <div className="mt-1 space-y-1">
-                                                            {stats.transferring.slice(0, 3).map((t, i) => (
-                                                                <div key={i} className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded px-2 py-1">
-                                                                    <span className="truncate flex-1 font-mono">{t.name}</span>
-                                                                    <span className="flex-shrink-0">{t.percentage}%</span>
-                                                                    <span className="flex-shrink-0 w-16 text-right">{formatSpeed(t.speed)}</span>
-                                                                    <span className="flex-shrink-0 w-20 text-right">{formatBytes(t.bytes)} / {formatBytes(t.size)}</span>
-                                                                </div>
-                                                            ))}
-                                                            {stats.transferring.length > 3 && (
-                                                                <p className="text-xs text-gray-400 px-2">...and {stats.transferring.length - 3} more</p>
-                                                            )}
+                                                        <div className="mt-1">
+                                                            <div className="text-xs text-gray-400 mb-1 px-0.5">Transferring ({stats.transferring.length})</div>
+                                                            <div className="space-y-1 max-h-60 overflow-y-auto pr-1">
+                                                                {stats.transferring.map((t, i) => (
+                                                                    <div key={i} className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700/50 rounded px-2 py-1">
+                                                                        <span className="truncate flex-1 font-mono">{t.name}</span>
+                                                                        <span className="flex-shrink-0">{t.percentage}%</span>
+                                                                        <span className="flex-shrink-0 w-16 text-right">{formatSpeed(t.speed)}</span>
+                                                                        <span className="flex-shrink-0 w-20 text-right">{formatBytes(t.bytes)} / {formatBytes(t.size)}</span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
 
+                                            {/* Error count for non-running tasks (running tasks show it in the stats grid above) */}
+                                            {task.status !== 'Running' && stats && stats.errors > 0 && (
+                                                <div className="mt-3 flex items-center gap-2 text-sm">
+                                                    <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                    <span className="text-gray-400">Errors</span>
+                                                    <span className="font-bold text-red-600 dark:text-red-400">{stats.errors}</span>
+                                                </div>
+                                            )}
+
                                             {task.error && (
                                                 <div className="mt-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 border border-red-200 dark:border-red-800">
-                                                    <div className="flex items-center gap-2">
-                                                        <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                        <span>{task.error}</span>
+                                                    <div className="flex items-start gap-2">
+                                                        <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                        <span className="whitespace-pre-wrap break-words">{task.error}</span>
                                                     </div>
                                                 </div>
                                             )}
