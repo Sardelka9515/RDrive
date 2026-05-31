@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/Sardelka9515/RDrive/compare/v0.3.0...v0.4.0) (2026-05-31)
+
+
+### Features
+
+* add scheduled jobs management to frontend and backend ([6966a62](https://github.com/Sardelka9515/RDrive/commit/6966a62e4b0d3216dc0119f950058fc81ecad12b))
+* enhance FileBrowser context menu and operations with current directory handling ([217b4d3](https://github.com/Sardelka9515/RDrive/commit/217b4d378e687c3b2caf83e1e7f10c342b307f87))
+* improve mobile responsiveness and clamp file browser context menu ([31a7762](https://github.com/Sardelka9515/RDrive/commit/31a776238c1c9d706a955ea91b4ded8714288e5d))
+
+
+### Bug Fixes
+
+* update version in package-lock and enhance error display in Jobs component ([14ebdb1](https://github.com/Sardelka9515/RDrive/commit/14ebdb132d59dc0ce4098ca6d6341f816d6c93ea))
+
 ## [0.3.0](https://github.com/Sardelka9515/RDrive/compare/v0.2.0...v0.3.0) (2026-02-15)
 
 
