@@ -165,41 +165,18 @@ public class FilesController : ControllerBase
     [HttpPost("copy/{*path}")]
     public async Task<IActionResult> CopyItem([FromRoute] string remoteName, [FromRoute] string path, [FromBody] FileOperationRequest request)
     {
-        try
-        {
-            var srcPath = Uri.UnescapeDataString(path).TrimStart('/');
-            var dstPath = request.DestinationPath.TrimStart('/');
-            
-            // Validate remotes exist
-            await _resolver.GetFsForRemoteAsync(remoteName);
-            await _resolver.GetFsForRemoteAsync(request.DestinationRemote);
-            
-            var task = new RTask
-            {
-                Id = Guid.NewGuid(),
-                Type = "Copy",
-                Status = "Queued",
-                IsDir = request.IsDir,
-                SourceRemote = remoteName,
-                SourcePath = srcPath,
-                DestRemote = request.DestinationRemote,
-                DestPath = dstPath,
-                CreatedAt = DateTime.UtcNow
-            };
-            
-            _db.Tasks.Add(task);
-            await _db.SaveChangesAsync();
-            
-            return Ok(task);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        return await EnqueueTransfer("Copy", remoteName, path, request);
     }
 
-    [HttpPost("move/{*path}")]
-    public async Task<IActionResult> MoveItem([FromRoute] string remoteName, [FromRoute] string path, [FromBody] FileOperationRequest request)
+    [HttpPost("copy")]
+    public async Task<IActionResult> CopyRoot([FromRoute] string remoteName, [FromBody] FileOperationRequest request)
+        => await EnqueueTransfer("Copy", remoteName, "", request);
+
+    [HttpPost("move")]
+    public async Task<IActionResult> MoveRoot([FromRoute] string remoteName, [FromBody] FileOperationRequest request)
+        => await EnqueueTransfer("Move", remoteName, "", request);
+
+    private async Task<IActionResult> EnqueueTransfer(string type, string remoteName, string path, FileOperationRequest request)
     {
         try
         {
@@ -213,7 +190,7 @@ public class FilesController : ControllerBase
             var task = new RTask
             {
                 Id = Guid.NewGuid(),
-                Type = "Move",
+                Type = type,
                 Status = "Queued",
                 IsDir = request.IsDir,
                 SourceRemote = remoteName,
@@ -222,10 +199,10 @@ public class FilesController : ControllerBase
                 DestPath = dstPath,
                 CreatedAt = DateTime.UtcNow
             };
-            
+
             _db.Tasks.Add(task);
             await _db.SaveChangesAsync();
-            
+
             return Ok(task);
         }
         catch (Exception ex)
@@ -233,6 +210,10 @@ public class FilesController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpPost("move/{*path}")]
+    public async Task<IActionResult> MoveItem([FromRoute] string remoteName, [FromRoute] string path, [FromBody] FileOperationRequest request)
+        => await EnqueueTransfer("Move", remoteName, path, request);
 
     [HttpPost("rename/{*path}")]
     public async Task<IActionResult> RenameItem([FromRoute] string remoteName, [FromRoute] string path, [FromBody] RenameRequest request)

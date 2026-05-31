@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FileItem } from '../../api';
+import { isCurrentDirItem } from './utils';
 
 interface OperationModalProps {
     type: 'copy' | 'move' | 'sync';
@@ -23,7 +24,11 @@ export function OperationModal({
     const [dstRemote, setDstRemote] = useState(currentRemote);
     const [dstPath, setDstPath] = useState(
         files.length === 1
-            ? (currentPath ? `${currentPath}/${files[0].Name}` : files[0].Name)
+            // The current folder already lives at currentPath, so default to a sibling of the
+            // same name at the destination root rather than nesting it under itself.
+            ? (isCurrentDirItem(files[0])
+                ? files[0].Name
+                : currentPath ? `${currentPath}/${files[0].Name}` : files[0].Name)
             : currentPath
     );
     const [loading, setLoading] = useState(false);

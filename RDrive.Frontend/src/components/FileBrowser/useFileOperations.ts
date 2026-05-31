@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { api, type FileItem } from '../../api';
-import { joinPath } from './utils';
+import { joinPath, isCurrentDirItem } from './utils';
 
 interface UseFileOperationsProps {
     remoteName: string | undefined;
@@ -89,7 +89,8 @@ export function useFileOperations({
         if (!remoteName || files.length === 0) return;
         try {
             for (const file of files) {
-                const srcPath = joinPath(currentPath, file.Name);
+                // The current-dir item already points at currentPath; other items are children of it.
+                const srcPath = isCurrentDirItem(file) ? currentPath : joinPath(currentPath, file.Name);
                 const fileDst = files.length === 1
                     ? dstPath
                     : joinPath(dstPath, file.Name);

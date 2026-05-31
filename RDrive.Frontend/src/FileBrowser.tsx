@@ -8,6 +8,7 @@ import { FileGrid } from './components/FileBrowser/FileGrid';
 import { ContextMenu } from './components/FileBrowser/ContextMenu';
 import { OperationModal } from './components/FileBrowser/OperationModal';
 import { SelectionBar } from './components/FileBrowser/SelectionBar';
+import { makeCurrentDirItem } from './components/FileBrowser/utils';
 import { useFileSelection } from './components/FileBrowser/useFileSelection';
 import { useFileSorting } from './components/FileBrowser/useFileSorting';
 import { useFileOperations } from './components/FileBrowser/useFileOperations';
@@ -175,9 +176,11 @@ export default function FileBrowser() {
         let targetFiles: FileItem[];
         if (fromBar) {
             targetFiles = getSelectedItems();
-        } else {
-            if (!contextMenu?.files.length) return;
+        } else if (contextMenu?.files.length) {
             targetFiles = contextMenu.files;
+        } else {
+            // Background menu: operate on the current directory itself (incl. remote root).
+            targetFiles = [makeCurrentDirItem(remoteName || '', currentPath)];
         }
         setContextMenu(null);
         if (!targetFiles.length) return;
@@ -319,6 +322,7 @@ export default function FileBrowser() {
                         selectAll();
                     }}
                     hasFiles={files.length > 0}
+                    currentFolderName={currentPath ? currentPath.split('/').filter(Boolean).pop() || '' : (remoteName || '')}
                 />
             )}
 

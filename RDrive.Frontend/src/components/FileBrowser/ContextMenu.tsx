@@ -14,6 +14,7 @@ interface ContextMenuProps {
     onNewFolder: () => void;
     onSelectAll: () => void;
     hasFiles: boolean;
+    currentFolderName: string;
 }
 
 export function ContextMenu({
@@ -29,6 +30,7 @@ export function ContextMenu({
     onNewFolder,
     onSelectAll,
     hasFiles,
+    currentFolderName,
 }: ContextMenuProps) {
     return (
         <div
@@ -123,8 +125,11 @@ export function ContextMenu({
                     </>
                 )
             ) : (
-                /* Background menu */
+                /* Background menu — acts on the current folder itself */
                 <>
+                    <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 font-semibold bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20 dark:to-transparent truncate text-gray-900 dark:text-white">
+                        {currentFolderName || 'Current folder'}
+                    </div>
                     <button
                         className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                         onClick={onNewFolder}
@@ -139,6 +144,25 @@ export function ContextMenu({
                             Select All
                         </button>
                     )}
+                    <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                    <button
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                        onClick={onCopy}
+                    >
+                        Copy this folder to...
+                    </button>
+                    <button
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                        onClick={onMove}
+                    >
+                        Move this folder to...
+                    </button>
+                    <button
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                        onClick={onSync}
+                    >
+                        Sync this folder to...
+                    </button>
                 </>
             )}
         </div>

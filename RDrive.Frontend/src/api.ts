@@ -250,7 +250,8 @@ export const api = {
     },
 
     copyFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
-        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/copy/${encodeURIComponent(path)}`, {
+        const suffix = path ? `/${encodeURIComponent(path)}` : '';
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/copy${suffix}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ DestinationRemote: dstRemote, DestinationPath: dstPath, IsDir: isDir })
@@ -263,7 +264,8 @@ export const api = {
     },
 
     moveFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
-        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/move/${encodeURIComponent(path)}`, {
+        const suffix = path ? `/${encodeURIComponent(path)}` : '';
+        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/move${suffix}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ DestinationRemote: dstRemote, DestinationPath: dstPath, IsDir: isDir })
