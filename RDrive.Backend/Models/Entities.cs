@@ -18,12 +18,48 @@ public class RTask
     public string SourcePath { get; set; } = string.Empty;
     public string DestRemote { get; set; } = string.Empty;
     public string DestPath { get; set; } = string.Empty;
-    
+
     public string? Error { get; set; }
-    
+
+    // Optional rclone tuning (set by scheduled jobs; null for manual tasks => rclone defaults)
+    public int? Transfers { get; set; }
+    public string? BwLimit { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? StartedAt { get; set; }
     public DateTime? FinishedAt { get; set; }
+}
+
+public class ScheduledJob
+{
+    public Guid Id { get; set; }
+
+    public string? Name { get; set; }
+
+    public string Type { get; set; } = "Sync"; // Sync, Copy, Move
+
+    public bool IsDir { get; set; } = true;
+
+    public string SourceRemote { get; set; } = string.Empty;
+    public string SourcePath { get; set; } = string.Empty;
+    public string DestRemote { get; set; } = string.Empty;
+    public string DestPath { get; set; } = string.Empty;
+
+    public string CronExpression { get; set; } = string.Empty;
+
+    // Optional rclone tuning applied to each spawned task
+    public int? Transfers { get; set; }
+    public string? BwLimit { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    public DateTime? LastRunAt { get; set; }
+    public DateTime? NextRunAt { get; set; }
+
+    // Soft reference (no FK) to the most recently spawned task, used for overlap blocking.
+    public Guid? LastTaskId { get; set; }
+
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Share

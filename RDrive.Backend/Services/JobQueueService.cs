@@ -80,11 +80,11 @@ public class JobQueueService : BackgroundService
                         {
                             var srcFull = srcFs + "/" + task.SourcePath;
                             var dstFull = dstFs + "/" + task.DestPath;
-                            jobId = await rclone.StartCopyAsync(srcFull, dstFull);
+                            jobId = await rclone.StartCopyAsync(srcFull, dstFull, task.Transfers, task.BwLimit);
                         }
                         else
                         {
-                            jobId = await rclone.StartCopyFileAsync(srcFs, task.SourcePath, dstFs, task.DestPath);
+                            jobId = await rclone.StartCopyFileAsync(srcFs, task.SourcePath, dstFs, task.DestPath, task.Transfers, task.BwLimit);
                         }
                         break;
 
@@ -93,11 +93,11 @@ public class JobQueueService : BackgroundService
                         {
                             var srcFull = srcFs + "/" + task.SourcePath;
                             var dstFull = dstFs + "/" + task.DestPath;
-                            jobId = await rclone.StartMoveAsync(srcFull, dstFull);
+                            jobId = await rclone.StartMoveAsync(srcFull, dstFull, task.Transfers, task.BwLimit);
                         }
                         else
                         {
-                            jobId = await rclone.StartMoveFileAsync(srcFs, task.SourcePath, dstFs, task.DestPath);
+                            jobId = await rclone.StartMoveFileAsync(srcFs, task.SourcePath, dstFs, task.DestPath, task.Transfers, task.BwLimit);
                         }
                         break;
 
@@ -105,7 +105,7 @@ public class JobQueueService : BackgroundService
                         {
                             var srcFull = srcFs + "/" + task.SourcePath;
                             var dstFull = dstFs + "/" + task.DestPath;
-                            jobId = await rclone.StartSyncAsync(srcFull, dstFull);
+                            jobId = await rclone.StartSyncAsync(srcFull, dstFull, task.Transfers, task.BwLimit);
                         }
                         break;
 

@@ -100,34 +100,52 @@ public class RcloneService
         return result?.Remotes ?? new List<string>();
     }
     
-    public async Task<long> StartSyncAsync(string srcFs, string dstFs)
+    /// <summary>
+    /// Builds an rclone RC "_config" object for per-job tuning, or null when nothing is set.
+    /// NOTE: rclone's BwLimit is a BwTimetable; passing a bare string like "10M" via _config
+    /// works on current rclone versions but is not guaranteed across all versions — verify at runtime.
+    /// </summary>
+    private static Dictionary<string, object>? BuildConfig(int? transfers, string? bwlimit)
     {
-        var payload = new
+        if (transfers is null && string.IsNullOrWhiteSpace(bwlimit)) return null;
+        var cfg = new Dictionary<string, object>();
+        if (transfers is int t) cfg["Transfers"] = t;
+        if (!string.IsNullOrWhiteSpace(bwlimit)) cfg["BwLimit"] = bwlimit;
+        return cfg;
+    }
+
+    public async Task<long> StartSyncAsync(string srcFs, string dstFs, int? transfers = null, string? bwlimit = null)
+    {
+        var payload = new Dictionary<string, object?>
         {
-            srcFs = srcFs,
-            dstFs = dstFs,
-            _async = true
+            ["srcFs"] = srcFs,
+            ["dstFs"] = dstFs,
+            ["_async"] = true
         };
+        var cfg = BuildConfig(transfers, bwlimit);
+        if (cfg != null) payload["_config"] = cfg;
 
         var response = await _http.PostAsJsonAsync("sync/sync", payload);
         response.EnsureSuccessStatusCode();
-        
+
         var result = await response.Content.ReadFromJsonAsync<RcloneJobStartResponse>();
         return result?.JobId ?? 0;
     }
-    
-    public async Task<long> StartCopyAsync(string srcFs, string dstFs)
+
+    public async Task<long> StartCopyAsync(string srcFs, string dstFs, int? transfers = null, string? bwlimit = null)
     {
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            srcFs = srcFs,
-            dstFs = dstFs,
-            _async = true
+            ["srcFs"] = srcFs,
+            ["dstFs"] = dstFs,
+            ["_async"] = true
         };
+        var cfg = BuildConfig(transfers, bwlimit);
+        if (cfg != null) payload["_config"] = cfg;
 
         var response = await _http.PostAsJsonAsync("sync/copy", payload);
         response.EnsureSuccessStatusCode();
-        
+
         var result = await response.Content.ReadFromJsonAsync<RcloneJobStartResponse>();
         return result?.JobId ?? 0;
     }
@@ -202,27 +220,42 @@ public class RcloneService
         }
     }
 
-    public async Task<long> StartCopyFileAsync(string srcFs, string srcRemote, string dstFs, string dstRemote)
+    public async Task<long> StartCopyFileAsync(string srcFs, string srcRemote, string dstFs, string dstRemote, int? transfers = null, string? bwlimit = null)
     {
-        var payload = new { srcFs = srcFs, srcRemote = srcRemote, dstFs = dstFs, dstRemote = dstRemote, _async = true };
+        var payload = new Dictionary<string, object?>
+        {
+            ["srcFs"] = srcFs, ["srcRemote"] = srcRemote, ["dstFs"] = dstFs, ["dstRemote"] = dstRemote, ["_async"] = true
+        };
+        var cfg = BuildConfig(transfers, bwlimit);
+        if (cfg != null) payload["_config"] = cfg;
         var response = await _http.PostAsJsonAsync("operations/copyfile", payload);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<RcloneJobStartResponse>();
         return result?.JobId ?? 0;
     }
 
-    public async Task<long> StartMoveFileAsync(string srcFs, string srcRemote, string dstFs, string dstRemote)
+    public async Task<long> StartMoveFileAsync(string srcFs, string srcRemote, string dstFs, string dstRemote, int? transfers = null, string? bwlimit = null)
     {
-        var payload = new { srcFs = srcFs, srcRemote = srcRemote, dstFs = dstFs, dstRemote = dstRemote, _async = true };
+        var payload = new Dictionary<string, object?>
+        {
+            ["srcFs"] = srcFs, ["srcRemote"] = srcRemote, ["dstFs"] = dstFs, ["dstRemote"] = dstRemote, ["_async"] = true
+        };
+        var cfg = BuildConfig(transfers, bwlimit);
+        if (cfg != null) payload["_config"] = cfg;
         var response = await _http.PostAsJsonAsync("operations/movefile", payload);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<RcloneJobStartResponse>();
         return result?.JobId ?? 0;
     }
 
-    public async Task<long> StartMoveAsync(string srcFs, string dstFs)
+    public async Task<long> StartMoveAsync(string srcFs, string dstFs, int? transfers = null, string? bwlimit = null)
     {
-        var payload = new { srcFs = srcFs, dstFs = dstFs, _async = true };
+        var payload = new Dictionary<string, object?>
+        {
+            ["srcFs"] = srcFs, ["dstFs"] = dstFs, ["_async"] = true
+        };
+        var cfg = BuildConfig(transfers, bwlimit);
+        if (cfg != null) payload["_config"] = cfg;
         var response = await _http.PostAsJsonAsync("sync/move", payload);
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<RcloneJobStartResponse>();

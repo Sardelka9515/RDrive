@@ -43,6 +43,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(optio
 builder.Services.Configure<RcloneOptions>(builder.Configuration.GetSection("Rclone"));
 builder.Services.AddHostedService<RcloneBackgroundService>();
 builder.Services.AddHostedService<JobQueueService>();
+builder.Services.AddHostedService<JobSchedulerService>();
 builder.Services.AddHttpClient<RcloneService>(client =>
 {
     client.Timeout = TimeSpan.FromHours(1); // Allow long running requests for large files

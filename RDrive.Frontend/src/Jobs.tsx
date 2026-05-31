@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
-import { api, type RTask } from './api';
+import { api, type RTask, type ScheduledJob, type ScheduledJobRequest } from './api';
 import { useToast } from './Toast';
+import { ScheduleModal } from './components/ScheduleModal';
 
 const STATUS_COLORS: Record<string, string> = {
     Queued: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300',
@@ -63,8 +64,13 @@ function formatEta(etaSeconds: number | null | undefined): string {
 export default function Jobs() {
     const [tasks, setTasks] = useState<RTask[]>([]);
     const [loading, setLoading] = useState(true);
+    const [scheduled, setScheduled] = useState<ScheduledJob[]>([]);
+    const [remotes, setRemotes] = useState<string[]>([]);
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalInitial, setModalInitial] = useState<Partial<ScheduledJobRequest> | undefined>(undefined);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const { showError } = useToast();
+    const { showError, showSuccess } = useToast();
 
     const loadTasks = async () => {
         try {
@@ -77,15 +83,94 @@ export default function Jobs() {
         }
     };
 
+    const loadScheduled = async () => {
+        try {
+            setScheduled(await api.getScheduledJobs());
+        } catch (err: any) {
+            showError(`Failed to load scheduled jobs: ${err.message}`);
+        }
+    };
+
     useEffect(() => {
         loadTasks();
+        loadScheduled();
+        api.getRemotes().then(setRemotes).catch(() => { /* non-fatal */ });
         intervalRef.current = setInterval(() => {
             loadTasks();
+            loadScheduled();
         }, 2000);
         return () => {
             if (intervalRef.current) clearInterval(intervalRef.current);
         };
     }, []);
+
+    const openNewSchedule = () => {
+        setModalInitial(undefined);
+        setEditingId(null);
+        setModalOpen(true);
+    };
+
+    const openEditSchedule = (job: ScheduledJob) => {
+        setModalInitial({
+            name: job.name,
+            type: job.type,
+            isDir: job.isDir,
+            sourceRemote: job.sourceRemote,
+            sourcePath: job.sourcePath,
+            destRemote: job.destRemote,
+            destPath: job.destPath,
+            cronExpression: job.cronExpression,
+            transfers: job.transfers,
+            bwLimit: job.bwLimit,
+            enabled: job.enabled,
+        });
+        setEditingId(job.id);
+        setModalOpen(true);
+    };
+
+    const scheduleFromTask = (task: RTask) => {
+        setModalInitial({
+            type: task.type,
+            isDir: task.isDir,
+            sourceRemote: task.sourceRemote,
+            sourcePath: task.sourcePath,
+            destRemote: task.destRemote,
+            destPath: task.destPath,
+            enabled: true,
+        });
+        setEditingId(null);
+        setModalOpen(true);
+    };
+
+    const handleToggleSchedule = async (id: string) => {
+        try {
+            await api.toggleScheduledJob(id);
+            loadScheduled();
+        } catch (err: any) {
+            showError(`Failed to toggle schedule: ${err.message}`);
+        }
+    };
+
+    const handleRunNow = async (id: string) => {
+        try {
+            await api.runScheduledJobNow(id);
+            showSuccess('Run started. Check the job list below.');
+            loadTasks();
+            loadScheduled();
+        } catch (err: any) {
+            showError(`Failed to run now: ${err.message}`);
+        }
+    };
+
+    const handleDeleteSchedule = async (id: string) => {
+        if (!confirm('Delete this scheduled job? Existing/running tasks are not affected.')) return;
+        try {
+            await api.deleteScheduledJob(id);
+            setScheduled(prev => prev.filter(s => s.id !== id));
+        } catch (err: any) {
+            showError(`Failed to delete schedule: ${err.message}`);
+        }
+    };
 
     const handleStop = async (id: string) => {
         try {
@@ -140,6 +225,13 @@ export default function Jobs() {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={openNewSchedule}
+                        className="btn-primary text-sm flex items-center gap-2"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        New Scheduled Job
+                    </button>
+                    <button
                         onClick={loadTasks}
                         className="btn-secondary text-sm flex items-center gap-2"
                     >
@@ -156,6 +248,48 @@ export default function Jobs() {
                     )}
                 </div>
             </div>
+
+            {/* Scheduled jobs */}
+            {scheduled.length > 0 && (
+                <div className="mb-8">
+                    <h3 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">Scheduled</h3>
+                    <div className="space-y-3">
+                        {scheduled.map(job => (
+                            <div key={job.id} className={`card-elevated p-4 ${job.enabled ? '' : 'opacity-60'}`}>
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center text-white text-xl shadow-md flex-shrink-0">
+                                            {TYPE_ICONS[job.type] || '📄'}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                <span className="font-bold text-gray-800 dark:text-white">{job.name || job.type}</span>
+                                                <span className="badge bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300 font-mono">{job.cronExpression}</span>
+                                                {!job.enabled && <span className="badge bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-400">Disabled</span>}
+                                                {job.transfers != null && <span className="badge bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">⇅ {job.transfers}</span>}
+                                                {job.bwLimit && <span className="badge bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">⤓ {job.bwLimit}</span>}
+                                            </div>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400 font-mono truncate">
+                                                {job.sourceRemote}:{job.sourcePath} → {job.destRemote}:{job.destPath}
+                                            </div>
+                                            <div className="mt-1 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                                                <span>Next: {job.enabled ? formatTime(job.nextRunAt || '') : '—'}</span>
+                                                {job.lastRunAt && <span>Last: {formatTime(job.lastRunAt)}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button onClick={() => handleRunNow(job.id)} className="px-3 py-1.5 text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium">Run now</button>
+                                        <button onClick={() => handleToggleSchedule(job.id)} className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all font-medium">{job.enabled ? 'Disable' : 'Enable'}</button>
+                                        <button onClick={() => openEditSchedule(job)} className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-all font-medium">Edit</button>
+                                        <button onClick={() => handleDeleteSchedule(job.id)} className="px-3 py-1.5 text-xs bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-all font-medium">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Content */}
             {loading ? (
@@ -334,6 +468,13 @@ export default function Jobs() {
 
                                     {/* Right side - actions */}
                                     <div className="flex items-start gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => scheduleFromTask(task)}
+                                            title="Create a recurring schedule from this job"
+                                            className="px-4 py-2 text-sm bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-all font-medium shadow-sm"
+                                        >
+                                            Schedule
+                                        </button>
                                         {(task.status === 'Running' || task.status === 'Queued') && (
                                             <button
                                                 onClick={() => handleStop(task.id)}
@@ -364,6 +505,16 @@ export default function Jobs() {
                         );
                     })}
                 </div>
+            )}
+
+            {modalOpen && (
+                <ScheduleModal
+                    remotes={remotes}
+                    initial={modalInitial}
+                    editingId={editingId}
+                    onClose={() => setModalOpen(false)}
+                    onSaved={loadScheduled}
+                />
             )}
         </div>
     );

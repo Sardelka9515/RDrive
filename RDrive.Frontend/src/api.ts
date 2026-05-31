@@ -56,6 +56,39 @@ export interface RTask {
     stats: TransferStats | null;
 }
 
+export interface ScheduledJob {
+    id: string;
+    name: string | null;
+    type: string;            // Copy | Move | Sync
+    isDir: boolean;
+    sourceRemote: string;
+    sourcePath: string;
+    destRemote: string;
+    destPath: string;
+    cronExpression: string;
+    transfers: number | null;
+    bwLimit: string | null;
+    enabled: boolean;
+    lastRunAt: string | null;
+    nextRunAt: string | null;
+    lastTaskId: string | null;
+    createdAt: string;
+}
+
+export interface ScheduledJobRequest {
+    name?: string | null;
+    type: string;
+    isDir: boolean;
+    sourceRemote: string;
+    sourcePath: string;
+    destRemote: string;
+    destPath: string;
+    cronExpression: string;
+    transfers?: number | null;
+    bwLimit?: string | null;
+    enabled: boolean;
+}
+
 export interface ProviderOption {
     Name: string;
     FieldName: string;
@@ -348,6 +381,65 @@ export const api = {
     clearCompletedTasks: async (): Promise<void> => {
         const res = await authFetch(`${API_BASE}/tasks`, { method: 'DELETE' });
         if (!res.ok) throw new Error('Failed to clear tasks');
+    },
+
+    // Scheduled jobs
+    getScheduledJobs: async (): Promise<ScheduledJob[]> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs`);
+        if (!res.ok) throw new Error('Failed to fetch scheduled jobs');
+        return res.json();
+    },
+
+    createScheduledJob: async (request: ScheduledJobRequest): Promise<ScheduledJob> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to create scheduled job');
+        }
+        return res.json();
+    },
+
+    updateScheduledJob: async (id: string, request: ScheduledJobRequest): Promise<ScheduledJob> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request)
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to update scheduled job');
+        }
+        return res.json();
+    },
+
+    deleteScheduledJob: async (id: string): Promise<void> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs/${id}`, { method: 'DELETE' });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to delete scheduled job');
+        }
+    },
+
+    toggleScheduledJob: async (id: string): Promise<ScheduledJob> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs/${id}/toggle`, { method: 'POST' });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to toggle scheduled job');
+        }
+        return res.json();
+    },
+
+    runScheduledJobNow: async (id: string): Promise<{ taskId: string }> => {
+        const res = await authFetch(`${API_BASE}/scheduledjobs/${id}/run-now`, { method: 'POST' });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to run scheduled job');
+        }
+        return res.json();
     },
 
     // Remote config management
