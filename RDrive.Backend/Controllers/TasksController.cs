@@ -31,40 +31,18 @@ public class TasksController : ControllerBase
         // Fetch per-job stats for each running task using rclone's job/{jobid} group
         var jobStats = new Dictionary<long, RcloneStatsResponse>();
         
-        // Poll rclone for running tasks to refresh status
+        // Fetch live per-job stats for running tasks (progress bars). Status transitions
+        // are owned by JobQueueService, so this endpoint never mutates task status.
         foreach (var task in tasks.Where(t => t.Status == "Running"))
         {
             try
             {
-                var status = await _rclone.GetJobStatusAsync(task.RcloneJobId);
-                if (status != null && status.Finished)
-                {
-                    task.Status = status.Success ? "Completed" : "Failed";
-                    task.FinishedAt = DateTime.UtcNow;
-                    if (!status.Success && !string.IsNullOrEmpty(status.Error))
-                        task.Error = status.Error;
-                    _db.Tasks.Update(task);
-                }
-                else
-                {
-                    // Fetch per-job stats using group name "job/{jobid}"
-                    try
-                    {
-                        var stats = await _rclone.GetTransferStatsAsync($"job/{task.RcloneJobId}");
-                        if (stats != null) jobStats[task.RcloneJobId] = stats;
-                    }
-                    catch { }
-                }
+                var stats = await _rclone.GetTransferStatsAsync($"job/{task.RcloneJobId}");
+                if (stats != null) jobStats[task.RcloneJobId] = stats;
             }
-            catch
-            {
-                // Job may have expired from rclone's memory
-                task.Status = "Unknown";
-            }
+            catch { }
         }
-        
-        await _db.SaveChangesAsync();
-        
+
         // Build response with per-job stats
         var result = tasks.Select(t => new TaskWithStats
         {
@@ -120,28 +98,8 @@ public class TasksController : ControllerBase
     {
         var task = await _db.Tasks.FindAsync(id);
         if (task == null) return NotFound();
-        
-        if (task.Status == "Running")
-        {
-            try
-            {
-                var status = await _rclone.GetJobStatusAsync(task.RcloneJobId);
-                if (status != null && status.Finished)
-                {
-                    task.Status = status.Success ? "Completed" : "Failed";
-                    task.FinishedAt = DateTime.UtcNow;
-                    if (!status.Success && !string.IsNullOrEmpty(status.Error))
-                        task.Error = status.Error;
-                    _db.Tasks.Update(task);
-                    await _db.SaveChangesAsync();
-                }
-            }
-            catch
-            {
-                // Job may have expired
-            }
-        }
-        
+
+        // Status transitions are owned by JobQueueService; this endpoint is read-only.
         return Ok(task);
     }
     

@@ -25,7 +25,9 @@ public class RcloneBackgroundService : BackgroundService
         var startInfo = new ProcessStartInfo
         {
             FileName = _options.Path,
-            Arguments = $"rcd --rc-web-gui --rc-addr={addr} --rc-user={_options.User} --rc-pass={_options.Password} --rc-serve --rc-allow-origin=*",
+            // --rc-job-expire-duration keeps finished jobs around long enough that a
+            // transiently-delayed status poll can still observe the result (default is 60s).
+            Arguments = $"rcd --rc-web-gui --rc-addr={addr} --rc-user={_options.User} --rc-pass={_options.Password} --rc-serve --rc-allow-origin=* --rc-job-expire-duration=1h",
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,

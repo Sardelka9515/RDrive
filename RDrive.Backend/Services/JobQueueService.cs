@@ -51,6 +51,10 @@ public class JobQueueService : BackgroundService
         var rclone = scope.ServiceProvider.GetRequiredService<RcloneService>();
         var resolver = scope.ServiceProvider.GetRequiredService<RclonePathResolver>();
 
+        // Reconcile already-running jobs first so finished ones free up slots and are
+        // recorded promptly (well within rclone's job-expiry window).
+        await ReconcileRunningTasksAsync(db, rclone, ct);
+
         // Count currently running jobs
         var runningCount = await db.Tasks.CountAsync(t => t.Status == "Running", ct);
         if (runningCount >= MaxConcurrentJobs) return;
@@ -138,5 +142,56 @@ public class JobQueueService : BackgroundService
         {
             await db.SaveChangesAsync(ct);
         }
+    }
+
+    /// <summary>
+    /// Polls rclone for every task marked Running and transitions finished ones to
+    /// Completed/Failed. Running on every poll cycle (and not just when the frontend
+    /// happens to fetch the task list) ensures we observe the finished state before
+    /// rclone expires the job from memory, which previously left completed jobs stuck
+    /// as "Unknown".
+    /// </summary>
+    private async Task ReconcileRunningTasksAsync(AppDbContext db, RcloneService rclone, CancellationToken ct)
+    {
+        var running = await db.Tasks.Where(t => t.Status == "Running").ToListAsync(ct);
+        if (running.Count == 0) return;
+
+        var changed = false;
+        foreach (var task in running)
+        {
+            try
+            {
+                var status = await rclone.GetJobStatusAsync(task.RcloneJobId);
+                if (status != null && status.Finished)
+                {
+                    task.Status = status.Success ? "Completed" : "Failed";
+                    task.FinishedAt = DateTime.UtcNow;
+                    if (!status.Success && !string.IsNullOrEmpty(status.Error))
+                        task.Error = status.Error;
+                    changed = true;
+                    _logger.LogInformation("Task {Id} (rclone job {JobId}) finished: {Status}",
+                        task.Id, task.RcloneJobId, task.Status);
+                }
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode != null)
+            {
+                // rclone responded but no longer knows about this job (expired or rclone
+                // was restarted). The outcome is genuinely undeterminable.
+                _logger.LogWarning("rclone has no record of job {JobId} for task {Id}; marking Unknown",
+                    task.RcloneJobId, task.Id);
+                task.Status = "Unknown";
+                task.FinishedAt = DateTime.UtcNow;
+                changed = true;
+            }
+            catch (Exception ex)
+            {
+                // Transient failure reaching rclone (connection refused, timeout, etc.).
+                // Leave the task Running and retry on the next poll instead of clobbering it.
+                _logger.LogDebug(ex, "Transient error polling job {JobId} for task {Id}; will retry",
+                    task.RcloneJobId, task.Id);
+            }
+        }
+
+        if (changed) await db.SaveChangesAsync(ct);
     }
 }
