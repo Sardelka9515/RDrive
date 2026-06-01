@@ -56,9 +56,27 @@ Directory.CreateDirectory(Path.GetDirectoryName(dbPath)!);
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlite($"Data Source={dbPath}"));
 
-// Authentication (optional OIDC)
-var authEnabled = !string.IsNullOrEmpty(builder.Configuration["Authentication:Authority"]);
-if (authEnabled)
+// Authentication. Three mutually-exclusive modes:
+//   - "oidc":     external OpenID Connect provider (when Authentication:Authority is set)
+//   - "password": built-in single user (when Auth:Password is set and OIDC is not)
+//   - "none":     no authentication (default)
+var oidcEnabled = !string.IsNullOrEmpty(builder.Configuration["Authentication:Authority"]);
+var singleUserPassword = builder.Configuration["Auth:Password"];
+var passwordAuthEnabled = !oidcEnabled && !string.IsNullOrEmpty(singleUserPassword);
+var authEnabled = oidcEnabled || passwordAuthEnabled;
+
+// Support a bearer token supplied via the query string for WebSocket connections.
+static Task ReadTokenFromQueryString(Microsoft.AspNetCore.Authentication.JwtBearer.MessageReceivedContext context)
+{
+    var accessToken = context.Request.Query["access_token"];
+    if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.WebSockets.IsWebSocketRequest)
+    {
+        context.Token = accessToken;
+    }
+    return Task.CompletedTask;
+}
+
+if (oidcEnabled)
 {
     builder.Services.AddAuthentication("Bearer")
         .AddJwtBearer("Bearer", options =>
@@ -71,18 +89,9 @@ if (authEnabled)
                 ValidateAudience = !string.IsNullOrEmpty(builder.Configuration["Authentication:Audience"]),
                 ValidateIssuer = true,
             };
-            // Support token from query string for WebSocket connections
             options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
             {
-                OnMessageReceived = context =>
-                {
-                    var accessToken = context.Request.Query["access_token"];
-                    if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.WebSockets.IsWebSocketRequest)
-                    {
-                        context.Token = accessToken;
-                    }
-                    return Task.CompletedTask;
-                }
+                OnMessageReceived = ReadTokenFromQueryString
             };
         });
 
@@ -91,13 +100,45 @@ if (authEnabled)
     {
         var policyBuilder = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
             .RequireAuthenticatedUser();
-        
+
         if (!string.IsNullOrEmpty(requiredRole))
         {
             policyBuilder.RequireRole(requiredRole);
         }
-        
+
         options.DefaultPolicy = policyBuilder.Build();
+    });
+}
+else if (passwordAuthEnabled)
+{
+    var dataDir = Path.GetDirectoryName(dbPath)!;
+    var signingKey = AuthTokenService.ResolveSigningKey(builder.Configuration["Auth:JwtSecret"], dataDir);
+    var tokenService = new AuthTokenService(singleUserPassword!, signingKey);
+    builder.Services.AddSingleton(tokenService);
+
+    builder.Services.AddAuthentication("Bearer")
+        .AddJwtBearer("Bearer", options =>
+        {
+            options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = tokenService.SigningKey,
+                ValidateIssuer = false,
+                ValidateAudience = false,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.FromMinutes(1),
+            };
+            options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+            {
+                OnMessageReceived = ReadTokenFromQueryString
+            };
+        });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
     });
 }
 else
@@ -156,9 +197,27 @@ app.UseAuthorization();
 app.MapGet("/api/auth/config", () => Results.Ok(new
 {
     enabled = authEnabled,
-    authority = authEnabled ? app.Configuration["Authentication:Authority"] : null,
-    clientId = authEnabled ? app.Configuration["Authentication:ClientId"] : null,
+    mode = oidcEnabled ? "oidc" : passwordAuthEnabled ? "password" : "none",
+    authority = oidcEnabled ? app.Configuration["Authentication:Authority"] : null,
+    clientId = oidcEnabled ? app.Configuration["Authentication:ClientId"] : null,
 })).AllowAnonymous();
+
+// Single-user password login: exchanges the configured password for a bearer token.
+if (passwordAuthEnabled)
+{
+    app.MapPost("/api/auth/login", (LoginRequest request, AuthTokenService auth) =>
+    {
+        if (!auth.ValidatePassword(request.Password))
+            return Results.Unauthorized();
+
+        var lifetime = TimeSpan.FromDays(7);
+        return Results.Ok(new
+        {
+            token = auth.IssueToken(lifetime),
+            expiresIn = (int)lifetime.TotalSeconds,
+        });
+    }).AllowAnonymous();
+}
 
 app.MapControllers();
 
@@ -169,3 +228,5 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+record LoginRequest(string? Password);

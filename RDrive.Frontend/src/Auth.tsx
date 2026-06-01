@@ -4,8 +4,11 @@ import { UserManager, User, WebStorageStateStore } from 'oidc-client-ts';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { setTokenGetter, setAccessDeniedHandler } from './api';
 
+type AuthMode = 'none' | 'oidc' | 'password';
+
 interface AuthConfig {
     enabled: boolean;
+    mode?: AuthMode;
     authority: string | null;
     clientId: string | null;
 }
@@ -14,9 +17,11 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     accessDenied: boolean;
+    mode: AuthMode | null;
     user: User | null;
     userName: string | null;
     login: () => void;
+    loginWithPassword: (password: string) => Promise<void>;
     logout: () => void;
     getAccessToken: () => Promise<string | null>;
 }
@@ -25,9 +30,11 @@ const AuthContext = createContext<AuthContextType>({
     isAuthenticated: false,
     isLoading: true,
     accessDenied: false,
+    mode: null,
     user: null,
     userName: null,
     login: () => {},
+    loginWithPassword: async () => {},
     logout: () => {},
     getAccessToken: async () => null,
 });
@@ -36,6 +43,7 @@ export const useAuth = () => useContext(AuthContext);
 
 const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 const RETURN_URL_KEY = 'rdrive_return_url';
+const TOKEN_KEY = 'rdrive_token';
 
 async function fetchAuthConfig(): Promise<AuthConfig> {
     const res = await fetch(`${API_BASE}/auth/config`);
@@ -43,7 +51,35 @@ async function fetchAuthConfig(): Promise<AuthConfig> {
     return res.json();
 }
 
-// Module-level singletons to survive StrictMode double-mount
+/* ── Password-mode token helpers ──────────────────────── */
+
+function loadToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+}
+function saveToken(token: string) {
+    localStorage.setItem(TOKEN_KEY, token);
+}
+function clearToken() {
+    localStorage.removeItem(TOKEN_KEY);
+}
+
+/** Returns the token's expiry in epoch milliseconds, or null if it has no/unparsable exp. */
+function tokenExpiry(token: string): number | null {
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        return typeof payload.exp === 'number' ? payload.exp * 1000 : null;
+    } catch {
+        return null;
+    }
+}
+function isTokenValid(token: string | null): token is string {
+    if (!token) return false;
+    const exp = tokenExpiry(token);
+    return exp == null ? true : Date.now() < exp;
+}
+
+/* ── OIDC singletons (survive StrictMode double-mount) ── */
+
 let _userManager: UserManager | null = null;
 let _callbackPromise: Promise<User | null> | null = null;
 let _redirecting = false;
@@ -72,7 +108,7 @@ function processCallback(mgr: UserManager): Promise<User | null> {
 }
 
 /** Wire the API module's auth token getter and 403 handler to this OIDC manager. */
-function wireApiBridge(mgr: UserManager, onAccessDenied: (denied: boolean) => void) {
+function wireOidcApiBridge(mgr: UserManager, onAccessDenied: (denied: boolean) => void) {
     setTokenGetter(async () => {
         const u = await mgr.getUser();
         return (u && !u.expired) ? u.access_token : null;
@@ -99,9 +135,10 @@ function subscribeToUserEvents(
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
+    const [mode, setMode] = useState<AuthMode | null>(null);
     const [user, setUser] = useState<User | null>(null);
+    const [token, setToken] = useState<string | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
-    const [authEnabled, setAuthEnabled] = useState<boolean | null>(null);
     const userManagerRef = useRef<UserManager | null>(null);
 
     useEffect(() => {
@@ -111,20 +148,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         async function init() {
             try {
                 const config = await fetchAuthConfig();
+                const m: AuthMode = config.mode ?? (config.enabled ? 'oidc' : 'none');
+                if (!cancelled) setMode(m);
 
-                if (!config.enabled) {
-                    if (!cancelled) {
-                        setAuthEnabled(false);
-                        setIsLoading(false);
-                    }
+                if (m === 'none') {
+                    if (!cancelled) setIsLoading(false);
                     return;
                 }
 
-                if (!cancelled) setAuthEnabled(true);
+                if (m === 'password') {
+                    // Read the stored token freshly on every request so it stays in sync.
+                    setTokenGetter(async () => {
+                        const t = loadToken();
+                        return isTokenValid(t) ? t : null;
+                    });
+                    // A 401/403 means the token is gone/expired — drop it and force re-login.
+                    setAccessDeniedHandler((denied) => {
+                        if (denied) {
+                            clearToken();
+                            if (!cancelled) setToken(null);
+                        }
+                    });
+                    const existing = loadToken();
+                    if (!cancelled && isTokenValid(existing)) setToken(existing);
+                    if (!cancelled) setIsLoading(false);
+                    return;
+                }
+
+                // m === 'oidc'
                 const mgr = getOrCreateUserManager(config);
                 userManagerRef.current = mgr;
 
-                wireApiBridge(mgr, (denied) => {
+                wireOidcApiBridge(mgr, (denied) => {
                     if (!cancelled) setAccessDenied(denied);
                 });
 
@@ -150,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!cancelled) setIsLoading(false);
             } catch {
                 if (!cancelled) {
-                    setAuthEnabled(false);
+                    setMode('none');
                     setIsLoading(false);
                 }
             }
@@ -171,41 +226,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mgr.signinRedirect().catch(() => { _redirecting = false; });
     }, []);
 
-    const logout = useCallback(() => {
-        const mgr = userManagerRef.current;
-        if (!mgr || _redirecting) return;
-        _redirecting = true;
-        mgr.signoutRedirect().catch(() => { _redirecting = false; });
+    const loginWithPassword = useCallback(async (password: string) => {
+        const res = await fetch(`${API_BASE}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        if (!res.ok) {
+            throw new Error(res.status === 401 ? 'Incorrect password' : 'Login failed. Please try again.');
+        }
+        const data = await res.json();
+        saveToken(data.token);
+        setToken(data.token);
+        setAccessDenied(false);
     }, []);
 
+    const logout = useCallback(() => {
+        if (mode === 'oidc') {
+            const mgr = userManagerRef.current;
+            if (!mgr || _redirecting) return;
+            _redirecting = true;
+            mgr.signoutRedirect().catch(() => { _redirecting = false; });
+            return;
+        }
+        // Password mode: clearing the token flips isAuthenticated and the route guard
+        // redirects to /login.
+        clearToken();
+        setToken(null);
+    }, [mode]);
+
     const getAccessToken = useCallback(async (): Promise<string | null> => {
+        if (mode === 'password') {
+            const t = loadToken();
+            return isTokenValid(t) ? t : null;
+        }
         const mgr = userManagerRef.current;
         if (!mgr) return null;
         const u = await mgr.getUser();
         if (!u || u.expired) return null;
         return u.access_token;
-    }, []);
+    }, [mode]);
 
-    // Reset access denied when user changes
+    // Reset access denied when the OIDC user changes
     useEffect(() => {
         setAccessDenied(false);
     }, [user]);
 
-    const isAuthenticated = authEnabled === false || (user != null && !user.expired && !accessDenied);
+    const isAuthenticated =
+        mode === 'none' ? true :
+        mode === 'password' ? isTokenValid(token) :
+        mode === 'oidc' ? (user != null && !user.expired && !accessDenied) :
+        false;
 
-    const userName = user?.profile?.preferred_username
-        || user?.profile?.name
-        || user?.profile?.email
-        || null;
+    const userName = mode === 'password'
+        ? 'admin'
+        : (user?.profile?.preferred_username
+            || user?.profile?.name
+            || user?.profile?.email
+            || null);
 
     return (
         <AuthContext.Provider value={{
             isAuthenticated,
             isLoading,
             accessDenied,
+            mode,
             user,
             userName,
             login,
+            loginWithPassword,
             logout,
             getAccessToken,
         }}>
@@ -240,18 +329,81 @@ export function CallbackPage() {
 }
 
 export function LoginPage() {
-    const { login, isLoading, isAuthenticated } = useAuth();
+    const { mode, login, loginWithPassword, isLoading, isAuthenticated } = useAuth();
+    const [password, setPassword] = useState('');
+    const [error, setError] = useState<string | null>(null);
+    const [submitting, setSubmitting] = useState(false);
 
+    // OIDC: redirect straight to the identity provider.
     useEffect(() => {
-        if (!isLoading && !isAuthenticated) {
+        if (mode === 'oidc' && !isLoading && !isAuthenticated) {
             login();
         }
-    }, [isLoading, isAuthenticated, login]);
+    }, [mode, isLoading, isAuthenticated, login]);
 
     if (!isLoading && isAuthenticated) {
         return <Navigate to="/" replace />;
     }
 
+    if (mode === 'password') {
+        const onSubmit = async (e: React.FormEvent) => {
+            e.preventDefault();
+            if (submitting) return;
+            setSubmitting(true);
+            setError(null);
+            try {
+                await loginWithPassword(password);
+            } catch (err: any) {
+                setError(err.message || 'Login failed');
+                setPassword('');
+            } finally {
+                setSubmitting(false);
+            }
+        };
+
+        return (
+            <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+                <div className="sm:mx-auto sm:w-full sm:max-w-md text-center mb-8">
+                    <h1 className="text-4xl font-bold text-blue-600 dark:text-blue-400 mb-2">RDrive</h1>
+                    <h2 className="text-lg text-gray-600 dark:text-gray-400">Sign in to continue</h2>
+                </div>
+                <div className="sm:mx-auto sm:w-full sm:max-w-md">
+                    <form
+                        onSubmit={onSubmit}
+                        className="bg-white dark:bg-gray-800 shadow-lg rounded-2xl p-8 border border-gray-200 dark:border-gray-700 space-y-5"
+                    >
+                        <div>
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                Password
+                            </label>
+                            <input
+                                id="password"
+                                type="password"
+                                autoFocus
+                                autoComplete="current-password"
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Enter your password"
+                            />
+                        </div>
+                        {error && (
+                            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={submitting || !password}
+                            className="btn-primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submitting ? 'Signing in...' : 'Sign in'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    // OIDC / loading: show a redirecting message.
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
