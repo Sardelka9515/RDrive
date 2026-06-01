@@ -54,14 +54,14 @@ public class SharesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateShare([FromBody] CreateShareRequest request)
     {
-        if (string.IsNullOrEmpty(request.Remote) || string.IsNullOrEmpty(request.Path))
-            return BadRequest("Remote and Path are required.");
+        if (string.IsNullOrEmpty(request.Remote))
+            return BadRequest("Remote is required.");
 
         var share = new Share
         {
             Id = Guid.NewGuid(),
             Remote = request.Remote,
-            Path = request.Path,
+            Path = request.Path ?? string.Empty,
             Name = request.Name,
             Description = request.Description,
             Password = request.Password, // TODO: Hash password

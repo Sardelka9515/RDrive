@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { api, type FileItem } from './api';
+import { api, type FileItem, type CreateShareRequest } from './api';
 import { useToast } from './Toast';
 import { Breadcrumbs } from './components/FileBrowser/Breadcrumbs';
 import { Toolbar } from './components/FileBrowser/Toolbar';
@@ -8,7 +8,8 @@ import { FileGrid } from './components/FileBrowser/FileGrid';
 import { ContextMenu } from './components/FileBrowser/ContextMenu';
 import { OperationModal } from './components/FileBrowser/OperationModal';
 import { SelectionBar } from './components/FileBrowser/SelectionBar';
-import { makeCurrentDirItem } from './components/FileBrowser/utils';
+import { ShareFormModal, emptyForm, type ShareFormData } from './components/ShareFormModal';
+import { makeCurrentDirItem, isCurrentDirItem, joinPath } from './components/FileBrowser/utils';
 import { useFileSelection } from './components/FileBrowser/useFileSelection';
 import { useFileSorting } from './components/FileBrowser/useFileSorting';
 import { useFileOperations } from './components/FileBrowser/useFileOperations';
@@ -26,6 +27,7 @@ export default function FileBrowser() {
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; files: FileItem[] } | null>(null);
     const [modal, setModal] = useState<{ type: 'copy' | 'move' | 'sync'; files: FileItem[] } | null>(null);
+    const [shareForm, setShareForm] = useState<ShareFormData | null>(null);
     const [remotes, setRemotes] = useState<string[]>([]);
 
     // Refs
@@ -196,6 +198,46 @@ export default function FileBrowser() {
         await handleCopyMove(type, files, dstRemote, dstPath);
     };
 
+    /* ── Share ────────────────────────────────────────── */
+
+    const openShare = () => {
+        // Single selection from the file menu, or the current folder from the background menu.
+        const target = contextMenu?.files.length
+            ? contextMenu.files[0]
+            : makeCurrentDirItem(remoteName || '', currentPath);
+        setContextMenu(null);
+        const sharePath = isCurrentDirItem(target) ? currentPath : joinPath(currentPath, target.Name);
+        setShareForm({
+            ...emptyForm,
+            Name: target.Name,
+            Remote: remoteName || '',
+            Path: sharePath,
+        });
+    };
+
+    const handleCreateShare = async (form: ShareFormData) => {
+        try {
+            const req: CreateShareRequest = {
+                remote: form.Remote,
+                path: form.Path,
+                name: form.Name,
+                description: form.Description,
+                password: form.Password || undefined,
+                expiration: form.Expiration ? new Date(form.Expiration).toISOString() : undefined,
+                maxDownloads: form.MaxDownloads,
+                isPublic: form.IsPublic,
+                recipients: form.Recipients,
+            };
+            const share = await api.createShare(req);
+            setShareForm(null);
+            const url = `${window.location.origin}/s/${share.id}`;
+            try { await navigator.clipboard.writeText(url); } catch { /* clipboard may be unavailable */ }
+            showSuccess('Share created — link copied to clipboard');
+        } catch (err: any) {
+            showError(`Failed to create share: ${err.message}`);
+        }
+    };
+
     /* ── Drag & Drop ──────────────────────────────────── */
 
     const handleFolderDrop = async (e: React.DragEvent, targetFolderPath: string) => {
@@ -309,6 +351,7 @@ export default function FileBrowser() {
                     onCopy={() => openModal('copy')}
                     onMove={() => openModal('move')}
                     onSync={() => openModal('sync')}
+                    onShare={openShare}
                     onDelete={() => {
                         handleDelete(contextMenu.files);
                         setContextMenu(null);
@@ -336,6 +379,19 @@ export default function FileBrowser() {
                     currentPath={currentPath}
                     onSubmit={handleModalSubmit}
                     onClose={() => setModal(null)}
+                />
+            )}
+
+            {/* Share Modal */}
+            {shareForm && (
+                <ShareFormModal
+                    isOpen={true}
+                    title="Create Share"
+                    initialData={shareForm}
+                    remotes={remotes}
+                    showRemotePath={false}
+                    onSave={handleCreateShare}
+                    onCancel={() => setShareForm(null)}
                 />
             )}
         </div>
