@@ -58,10 +58,18 @@ public class AuthTokenService
     /// otherwise generates a random key persisted under the data directory so issued tokens
     /// remain valid across restarts.
     /// </summary>
+    // Fixed salt provides domain separation; iteration count makes offline JWT cracking expensive.
+    private static readonly byte[] _kdfSalt = "rdrive-jwt-signing-v1"u8.ToArray();
+
     public static byte[] ResolveSigningKey(string? configuredSecret, string dataDir)
     {
         if (!string.IsNullOrWhiteSpace(configuredSecret))
-            return SHA256.HashData(Encoding.UTF8.GetBytes(configuredSecret));
+            return Rfc2898DeriveBytes.Pbkdf2(
+                Encoding.UTF8.GetBytes(configuredSecret),
+                _kdfSalt,
+                iterations: 100_000,
+                HashAlgorithmName.SHA256,
+                outputLength: 32);
 
         var keyPath = Path.Combine(dataDir, "jwt-signing.key");
         if (File.Exists(keyPath))
