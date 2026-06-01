@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/Sardelka9515/RDrive/compare/v0.4.0...v0.5.0) (2026-06-01)
+
+
+### Features
+
+* add Share action to file browser context menu ([d5a58e8](https://github.com/Sardelka9515/RDrive/commit/d5a58e8cb054a485517bd01b828811da8f759cbc))
+* enhance JWT signing key resolution with PBKDF2 for improved security ([277bf94](https://github.com/Sardelka9515/RDrive/commit/277bf94225a9ea197b08d91c53567e3b178dbf7e))
+* implement single-user password authentication and update configuration ([fdfaec3](https://github.com/Sardelka9515/RDrive/commit/fdfaec3bef7f46c3b00c02021ee53c3a2ede305a))
+
+
+### Bug Fixes
+
+* reliably resolve completed job status instead of marking Unknown ([8c45d0a](https://github.com/Sardelka9515/RDrive/commit/8c45d0a888a949a89a3bdeb9f8d84e934d96d49d))
+
 ## [0.4.0](https://github.com/Sardelka9515/RDrive/compare/v0.3.0...v0.4.0) (2026-05-31)
 
 
