@@ -13,6 +13,29 @@ export function formatDate(dateStr: string): string {
     return new Date(dateStr).toLocaleString();
 }
 
+export type MediaKind = 'image' | 'video';
+
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'ico'];
+const VIDEO_EXTENSIONS = ['mp4', 'webm', 'ogv', 'ogg', 'mov', 'm4v', 'mkv'];
+
+function fileExtension(name: string): string {
+    const dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.slice(dot + 1).toLowerCase() : '';
+}
+
+/** Detect whether a file can be previewed in the in-browser media viewer. */
+export function getMediaKind(file: FileItem): MediaKind | null {
+    if (file.IsDir) return null;
+    const mime = (file.MimeType || '').toLowerCase();
+    if (mime.startsWith('image/')) return 'image';
+    if (mime.startsWith('video/')) return 'video';
+    // Fall back to the extension when the remote reports a generic mime type.
+    const ext = fileExtension(file.Name);
+    if (IMAGE_EXTENSIONS.includes(ext)) return 'image';
+    if (VIDEO_EXTENSIONS.includes(ext)) return 'video';
+    return null;
+}
+
 export function parseBreadcrumbs(path: string): string[] {
     return path.split('/').filter(Boolean);
 }

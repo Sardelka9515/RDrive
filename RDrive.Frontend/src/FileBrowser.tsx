@@ -9,7 +9,8 @@ import { ContextMenu } from './components/FileBrowser/ContextMenu';
 import { OperationModal } from './components/FileBrowser/OperationModal';
 import { SelectionBar } from './components/FileBrowser/SelectionBar';
 import { ShareFormModal, emptyForm, type ShareFormData } from './components/ShareFormModal';
-import { makeCurrentDirItem, isCurrentDirItem, joinPath } from './components/FileBrowser/utils';
+import { MediaViewer } from './components/FileBrowser/MediaViewer';
+import { makeCurrentDirItem, isCurrentDirItem, joinPath, getMediaKind } from './components/FileBrowser/utils';
 import { useFileSelection } from './components/FileBrowser/useFileSelection';
 import { useFileSorting } from './components/FileBrowser/useFileSorting';
 import { useFileOperations } from './components/FileBrowser/useFileOperations';
@@ -29,6 +30,7 @@ export default function FileBrowser() {
     const [modal, setModal] = useState<{ type: 'copy' | 'move' | 'sync'; files: FileItem[] } | null>(null);
     const [shareForm, setShareForm] = useState<ShareFormData | null>(null);
     const [remotes, setRemotes] = useState<string[]>([]);
+    const [viewer, setViewer] = useState<{ items: FileItem[]; index: number } | null>(null);
 
     // Refs
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,17 +131,31 @@ export default function FileBrowser() {
         handleFileClick(e, file, index, sortedFiles);
     };
 
+    const downloadFile = (file: FileItem) => {
+        if (!remoteName) return;
+        const targetPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
+        api.downloadFile(remoteName, targetPath, file.Name).catch(err => {
+            console.error('Download failed:', err);
+            showError(`Failed to download: ${err.message}`);
+        });
+    };
+
     const handleFileDoubleClick = (e: React.MouseEvent, file: FileItem) => {
         e.stopPropagation();
         if (!remoteName) return;
-        const targetPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
         if (file.IsDir) {
+            const targetPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
             navigate(`/remotes/${remoteName}/${targetPath}`);
+            return;
+        }
+        // Preview images and videos in-browser; otherwise fall back to downloading.
+        if (getMediaKind(file)) {
+            const mediaItems = sortedFiles.filter(f => getMediaKind(f));
+            const index = mediaItems.findIndex(f => f.Name === file.Name);
+            setContextMenu(null);
+            setViewer({ items: mediaItems, index: index < 0 ? 0 : index });
         } else {
-            api.downloadFile(remoteName, targetPath, file.Name).catch(err => {
-                console.error('Download failed:', err);
-                showError(`Failed to download: ${err.message}`);
-            });
+            downloadFile(file);
         }
     };
 
@@ -379,6 +395,18 @@ export default function FileBrowser() {
                     currentPath={currentPath}
                     onSubmit={handleModalSubmit}
                     onClose={() => setModal(null)}
+                />
+            )}
+
+            {/* Media Viewer */}
+            {viewer && remoteName && (
+                <MediaViewer
+                    remoteName={remoteName}
+                    currentPath={currentPath}
+                    items={viewer.items}
+                    startIndex={viewer.index}
+                    onClose={() => setViewer(null)}
+                    onDownload={downloadFile}
                 />
             )}
 

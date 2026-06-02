@@ -65,6 +65,13 @@ var singleUserPassword = builder.Configuration["Auth:Password"];
 var passwordAuthEnabled = !oidcEnabled && !string.IsNullOrEmpty(singleUserPassword);
 var authEnabled = oidcEnabled || passwordAuthEnabled;
 
+// Media tokens let browser <img>/<video>/download requests (which can't send an
+// Authorization header) stream a single file via a short-lived, read-only ?media_token=.
+// Available in every auth mode; signed with the same key resolution as the bearer JWTs.
+var mediaSigningKey = AuthTokenService.ResolveSigningKey(
+    builder.Configuration["Auth:JwtSecret"], Path.GetDirectoryName(dbPath)!);
+builder.Services.AddSingleton(new MediaTokenService(mediaSigningKey));
+
 // Support a bearer token supplied via the query string for WebSocket connections.
 static Task ReadTokenFromQueryString(Microsoft.AspNetCore.Authentication.JwtBearer.MessageReceivedContext context)
 {
@@ -219,6 +226,18 @@ if (passwordAuthEnabled)
     }).AllowAnonymous();
 }
 
+// Mint a short-lived, read-only token scoped to a single file, for streaming it from a URL
+// (media preview / download) where an Authorization header can't be sent. Requires auth.
+app.MapPost("/api/auth/media-token", (MediaTokenRequest request, MediaTokenService media) =>
+{
+    if (string.IsNullOrEmpty(request.Remote) || string.IsNullOrEmpty(request.Path))
+        return Results.BadRequest("Remote and path are required");
+
+    var ttl = TimeSpan.FromHours(4);
+    var token = media.Issue(request.Remote, request.Path.TrimStart('/'), ttl);
+    return Results.Ok(new { token, expiresIn = (int)ttl.TotalSeconds });
+}).RequireAuthorization();
+
 app.MapControllers();
 
 // SPA fallback — serves index.html for client-side routes like /callback
@@ -230,3 +249,4 @@ if (!app.Environment.IsDevelopment())
 app.Run();
 
 record LoginRequest(string? Password);
+record MediaTokenRequest(string? Remote, string? Path);

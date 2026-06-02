@@ -20,13 +20,15 @@ public class FilesController : ControllerBase
     private readonly RclonePathResolver _resolver;
     private readonly HttpClient _httpClient;
     private readonly AppDbContext _db;
+    private readonly MediaTokenService _mediaTokens;
 
-    public FilesController(RcloneService rclone, RclonePathResolver resolver, IHttpClientFactory clientFactory, AppDbContext db)
+    public FilesController(RcloneService rclone, RclonePathResolver resolver, IHttpClientFactory clientFactory, AppDbContext db, MediaTokenService mediaTokens)
     {
         _rclone = rclone;
         _resolver = resolver;
         _httpClient = clientFactory.CreateClient();
         _db = db;
+        _mediaTokens = mediaTokens;
     }
 
     [HttpGet]
@@ -46,23 +48,35 @@ public class FilesController : ControllerBase
         }
     }
 
+    // AllowAnonymous so browser <img>/<video>/download requests (no Authorization header) can
+    // stream via a scoped ?media_token=. The header-bearer path still works and is checked first.
+    [AllowAnonymous]
     [HttpGet("{*path}")]
-    public async Task<IActionResult> DownloadFile([FromRoute] string remoteName, [FromRoute] string path)
+    public async Task<IActionResult> DownloadFile([FromRoute] string remoteName, [FromRoute] string path, [FromQuery] string? media_token = null, [FromQuery] bool download = false)
     {
         try
         {
-            var fs = await _resolver.GetFsForRemoteAsync(remoteName);
             var filePath = Uri.UnescapeDataString(path).TrimStart('/');
-            
+
+            // Either an authenticated bearer (header) or a valid media token scoped to this exact file.
+            var authenticated = User.Identity?.IsAuthenticated == true
+                || _mediaTokens.Validate(remoteName, filePath, media_token);
+            if (!authenticated) return Unauthorized();
+
+            var fs = await _resolver.GetFsForRemoteAsync(remoteName);
+
             var response = await _rclone.DownloadFileAsync(fs, filePath, Request.Headers["Range"].ToString());
-            
+
             if (!response.IsSuccessStatusCode) return StatusCode((int)response.StatusCode);
 
             var stream = await response.Content.ReadAsStreamAsync();
-            
-            return File(stream, 
-                response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream", 
-                enableRangeProcessing: true);
+            var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
+
+            // download=true forces a Content-Disposition: attachment with the right filename
+            // (needed for cross-origin saves in dev); otherwise serve inline for media preview.
+            return download
+                ? File(stream, contentType, Path.GetFileName(filePath), enableRangeProcessing: true)
+                : File(stream, contentType, enableRangeProcessing: true);
         }
         catch (Exception ex)
         {

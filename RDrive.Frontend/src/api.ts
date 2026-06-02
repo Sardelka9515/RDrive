@@ -265,21 +265,41 @@ export const api = {
         }
     },
 
+    // Stream the download straight to disk via a scoped media token — the browser fetches
+    // the URL natively (no in-memory blob), so large files start saving immediately.
     downloadFile: async (remoteName: string, path: string, fileName: string): Promise<void> => {
-        const res = await authFetch(`${API_BASE}/remotes/${remoteName}/files/${encodeURIComponent(path)}`);
-        if (!res.ok) {
-            const text = await res.text();
-            throw new Error(text || 'Failed to download file');
-        }
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
+        const token = await api.getMediaToken(remoteName, path);
+        const url = api.buildStreamUrl(remoteName, path, token, { download: true });
         const a = document.createElement('a');
         a.href = url;
         a.download = fileName;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+    },
+
+    // Mint a short-lived, read-only token scoped to a single file. Used to build a stream URL
+    // that browser media elements / download anchors can use without an Authorization header.
+    getMediaToken: async (remoteName: string, path: string, signal?: AbortSignal): Promise<string> => {
+        const res = await authFetch(`${API_BASE}/auth/media-token`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ remote: remoteName, path }),
+            signal,
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to authorize media access');
+        }
+        const data = await res.json();
+        return data.token;
+    },
+
+    // Build a direct, streamable file URL authenticated by a scoped media token.
+    buildStreamUrl: (remoteName: string, path: string, token: string, opts?: { download?: boolean }): string => {
+        const params = new URLSearchParams({ media_token: token });
+        if (opts?.download) params.set('download', 'true');
+        return `${API_BASE}/remotes/${remoteName}/files/${encodeURIComponent(path)}?${params.toString()}`;
     },
 
     copyFile: async (remoteName: string, path: string, dstRemote: string, dstPath: string, isDir: boolean = false): Promise<RTask> => {
