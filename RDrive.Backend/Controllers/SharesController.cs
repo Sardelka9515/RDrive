@@ -68,6 +68,7 @@ public class SharesController : ControllerBase
             Expiration = request.Expiration,
             MaxDownloads = request.MaxDownloads,
             IsPublic = request.IsPublic,
+            AllowWrite = request.AllowWrite,
             Creator = User.Identity?.Name ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "Anonymous",
             CreatedAt = DateTime.UtcNow,
             Recipients = request.Recipients.Select(r => new ShareRecipient
@@ -97,6 +98,7 @@ public class SharesController : ControllerBase
         share.Expiration = request.Expiration;
         share.MaxDownloads = request.MaxDownloads;
         share.IsPublic = request.IsPublic;
+        share.AllowWrite = request.AllowWrite;
 
         // Sync recipients
         _db.ShareRecipients.RemoveRange(share.Recipients);
@@ -138,6 +140,7 @@ public class SharesController : ControllerBase
             Views = s.Views,
             MaxDownloads = s.MaxDownloads,
             IsPublic = s.IsPublic,
+            AllowWrite = s.AllowWrite,
             Recipients = s.Recipients.Select(r => new ShareRecipientDto
             {
                 Email = r.Email,

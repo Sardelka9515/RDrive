@@ -155,17 +155,10 @@ public class PublicSharesControllerTests
     [Fact]
     public async Task UploadFile_ReturnsOk_WhenAuthorizedAndWriteable()
     {
-        var share = new Share { Id = Guid.NewGuid(), Remote = "myremote:", Path = "data", IsPublic = true };
-        var recipient = new ShareRecipient { Email = "test@example.com", Permission = "Write", ShareId = share.Id };
-        share.Recipients.Add(recipient);
+        // Editable public share: anyone with the link may write.
+        var share = new Share { Id = Guid.NewGuid(), Remote = "myremote:", Path = "data", IsPublic = true, AllowWrite = true };
         _db.Shares.Add(share);
         await _db.SaveChangesAsync();
-
-        // Simulate authorized user
-        var user = new ClaimsPrincipal(new ClaimsIdentity(new Claim[] {
-            new Claim(ClaimTypes.Email, "test@example.com")
-        }, "TestAuth"));
-        _controller.ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext { User = user } };
 
         // Mock Rclone Upload response
         _httpHandlerMock.Protected()
@@ -190,5 +183,25 @@ public class PublicSharesControllerTests
         var result = await _controller.UploadFile(share.Id, "test.txt", file);
 
         Assert.IsType<OkResult>(result);
+    }
+
+    [Fact]
+    public async Task UploadFile_ReturnsUnauthorized_WhenNotWriteable()
+    {
+        // Public but read-only (AllowWrite defaults to false).
+        var share = new Share { Id = Guid.NewGuid(), Remote = "myremote:", Path = "data", IsPublic = true };
+        _db.Shares.Add(share);
+        await _db.SaveChangesAsync();
+
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes("content"));
+        var file = new FormFile(stream, 0, stream.Length, "file", "test.txt")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "text/plain"
+        };
+
+        var result = await _controller.UploadFile(share.Id, "test.txt", file);
+
+        Assert.IsType<UnauthorizedResult>(result);
     }
 }

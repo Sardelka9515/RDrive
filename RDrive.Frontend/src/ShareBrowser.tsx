@@ -1,25 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, type FileItem, type PublicShareInfo } from './api';
-
-function formatSize(bytes: number): string {
-    if (bytes === 0) return '—';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-function formatDate(dateStr: string): string {
-    if (!dateStr || dateStr.startsWith('0001-01-01')) return '';
-    return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
+import { useToast } from './Toast';
+import { Toolbar } from './components/FileBrowser/Toolbar';
+import { FileGrid } from './components/FileBrowser/FileGrid';
+import { ContextMenu } from './components/FileBrowser/ContextMenu';
+import { SelectionBar } from './components/FileBrowser/SelectionBar';
+import { useFileSelection } from './components/FileBrowser/useFileSelection';
+import { useFileSorting } from './components/FileBrowser/useFileSorting';
+import { useShareFileOperations } from './components/FileBrowser/useShareFileOperations';
 
 type Phase = 'loading' | 'password' | 'browse' | 'error';
+
+const noop = () => {};
 
 export default function ShareBrowser() {
     const { shareId, '*': subPath } = useParams<{ shareId: string; '*': string }>();
     const navigate = useNavigate();
+    const { showError } = useToast();
     const currentPath = subPath || '';
 
     const [phase, setPhase] = useState<Phase>('loading');
@@ -29,15 +27,35 @@ export default function ShareBrowser() {
     const [token, setToken] = useState<string | undefined>();
     const [files, setFiles] = useState<FileItem[]>([]);
     const [filesLoading, setFilesLoading] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; files: FileItem[] } | null>(null);
 
-    // Load share info
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const writeable = !!info?.writeable;
+
+    const { sortedFiles, sortBy, sortOrder, toggleSort, setSortOrder } = useFileSorting(files);
+    const {
+        selectedNames,
+        getSelectedItems,
+        handleFileClick,
+        selectAll,
+        clearSelection,
+        selectSingle,
+    } = useFileSelection(files);
+
+    const reload = () => setRefreshKey(k => k + 1);
+    const { uploading, uploadProgress, handleUpload, handleNewFolder, handleRename, handleDelete } =
+        useShareFileOperations({ shareId, token, currentPath, onError: showError, onReload: reload });
+
+    /* ── Load share info ──────────────────────────────── */
     useEffect(() => {
         if (!shareId) return;
         api.getPublicShareInfo(shareId)
             .then(data => {
                 setInfo(data);
                 if (data.hasPassword) {
-                    // Check if we have a cached token
                     const cached = sessionStorage.getItem(`share-token-${shareId}`);
                     if (cached) {
                         setToken(cached);
@@ -55,16 +73,26 @@ export default function ShareBrowser() {
             });
     }, [shareId]);
 
-    // Load files when browsing
+    /* ── Load files ───────────────────────────────────── */
     useEffect(() => {
         if (phase !== 'browse' || !shareId) return;
+        clearSelection();
         setFilesLoading(true);
         api.listShareFiles(shareId, currentPath, token)
             .then(setFiles)
-            .catch(err => setError(err.message))
+            .catch(err => showError(err.message))
             .finally(() => setFilesLoading(false));
-    }, [phase, shareId, currentPath, token]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phase, shareId, currentPath, token, refreshKey]);
 
+    // Close context menu on outside click
+    useEffect(() => {
+        const h = () => setContextMenu(null);
+        document.addEventListener('click', h);
+        return () => document.removeEventListener('click', h);
+    }, []);
+
+    /* ── Auth ─────────────────────────────────────────── */
     async function handlePasswordSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!shareId) return;
@@ -78,27 +106,58 @@ export default function ShareBrowser() {
         }
     }
 
-    function navigateTo(file: FileItem) {
-        if (!file.IsDir) return;
-        const newPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
-        navigate(`/s/${shareId}/${newPath}`);
-    }
-
+    /* ── Navigation & file actions ────────────────────── */
     function handleDownload(file: FileItem) {
         if (!shareId) return;
         const filePath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
         api.downloadShareFile(shareId, filePath, file.Name, token);
     }
 
-    function navigateUp() {
-        const segments = currentPath.split('/').filter(Boolean);
-        segments.pop();
-        navigate(`/s/${shareId}/${segments.join('/')}`);
-    }
+    const handleFileClickWrapper = (e: React.MouseEvent, file: FileItem, index: number) => {
+        setContextMenu(null);
+        handleFileClick(e, file, index, sortedFiles);
+    };
+
+    const handleFileDoubleClick = (e: React.MouseEvent, file: FileItem) => {
+        e.stopPropagation();
+        if (file.IsDir) {
+            const newPath = currentPath ? `${currentPath}/${file.Name}` : file.Name;
+            navigate(`/s/${shareId}/${newPath}`);
+        } else {
+            handleDownload(file);
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, file: FileItem) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!writeable) return;
+        let targets: FileItem[];
+        if (selectedNames.has(file.Name) && selectedNames.size > 1) {
+            targets = getSelectedItems();
+        } else {
+            selectSingle(file.Name);
+            targets = [file];
+        }
+        setContextMenu({ x: e.clientX, y: e.clientY, files: targets });
+    };
+
+    const handleBackgroundContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        if (!writeable) return;
+        setContextMenu({ x: e.clientX, y: e.clientY, files: [] });
+    };
+
+    const handleUploadClick = () => fileInputRef.current?.click();
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0) return;
+        await handleUpload(e.target.files[0]);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
 
     const breadcrumbs = currentPath.split('/').filter(Boolean);
 
-    // Error screen
+    /* ── Error / loading / password screens ───────────── */
     if (phase === 'error') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -111,7 +170,6 @@ export default function ShareBrowser() {
         );
     }
 
-    // Loading screen
     if (phase === 'loading') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -120,7 +178,6 @@ export default function ShareBrowser() {
         );
     }
 
-    // Password screen
     if (phase === 'password') {
         return (
             <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
@@ -152,17 +209,26 @@ export default function ShareBrowser() {
         );
     }
 
-    // Browse screen
+    /* ── Browse screen ────────────────────────────────── */
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100">
+        <div
+            className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100"
+            onClick={() => { clearSelection(); setContextMenu(null); }}
+            onContextMenu={handleBackgroundContextMenu}
+        >
             {/* Header */}
-            <header className="bg-white dark:bg-gray-800 shadow px-6 py-4 flex items-center justify-between">
+            <header className="bg-white dark:bg-gray-800 shadow px-6 py-4 flex items-center justify-between" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                         <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                     </div>
                     <div>
-                        <h1 className="font-bold text-lg text-gray-900 dark:text-white">{info?.name || 'Shared Files'}</h1>
+                        <h1 className="font-bold text-lg text-gray-900 dark:text-white flex items-center gap-2">
+                            {info?.name || 'Shared Files'}
+                            {writeable && (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">Editable</span>
+                            )}
+                        </h1>
                         {info?.description && <p className="text-xs text-gray-500 dark:text-gray-400">{info.description}</p>}
                     </div>
                 </div>
@@ -170,96 +236,64 @@ export default function ShareBrowser() {
             </header>
 
             <div className="max-w-5xl mx-auto p-6">
-                {/* Breadcrumb */}
-                <nav className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 mb-4 flex-wrap">
-                    <button
-                        onClick={() => navigate(`/s/${shareId}`)}
-                        className="hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
-                    >
-                        {info?.name || 'Root'}
-                    </button>
-                    {breadcrumbs.map((seg, i) => (
-                        <span key={i} className="flex items-center gap-1">
-                            <span className="text-gray-300 dark:text-gray-600">/</span>
-                            <button
-                                onClick={() => navigate(`/s/${shareId}/${breadcrumbs.slice(0, i + 1).join('/')}`)}
-                                className="hover:text-blue-600 dark:hover:text-blue-400 transition"
-                            >
-                                {seg}
-                            </button>
-                        </span>
-                    ))}
-                </nav>
-
-                {/* File list */}
-                {filesLoading ? (
-                    <div className="text-center py-16 text-gray-500 dark:text-gray-400">Loading files...</div>
-                ) : files.length === 0 ? (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow min-h-[200px] flex items-center justify-center border-2 border-dashed border-gray-200 dark:border-gray-700">
-                        <p className="text-gray-400 dark:text-gray-500">This folder is empty</p>
-                    </div>
-                ) : (
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-200 dark:border-gray-700 overflow-hidden">
-                        {/* Table header */}
-                        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 bg-gray-50 dark:bg-gray-700/50 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider border-b border-gray-200 dark:border-gray-700">
-                            <span>Name</span>
-                            <span className="w-24 text-right">Size</span>
-                            <span className="w-40 text-right hidden sm:block">Modified</span>
-                            <span className="w-10"></span>
-                        </div>
-                        {/* Back row */}
-                        {currentPath && (
-                            <button
-                                onClick={navigateUp}
-                                className="grid grid-cols-[1fr_auto_auto_auto] gap-4 w-full px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition text-left border-b border-gray-100 dark:border-gray-700/50"
-                            >
-                                <span className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
-                                    ..
-                                </span>
-                                <span className="w-24"></span>
-                                <span className="w-40 hidden sm:block"></span>
-                                <span className="w-10"></span>
-                            </button>
-                        )}
-                        {/* File rows */}
-                        {files.map(file => (
-                            <div
-                                key={file.Name}
-                                className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition border-b last:border-b-0 border-gray-100 dark:border-gray-700/50 group"
-                            >
+                {/* Breadcrumb + toolbar */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4" onClick={e => e.stopPropagation()}>
+                    <nav className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
+                        <button
+                            onClick={() => navigate(`/s/${shareId}`)}
+                            className="hover:text-blue-600 dark:hover:text-blue-400 transition font-medium"
+                        >
+                            {info?.name || 'Root'}
+                        </button>
+                        {breadcrumbs.map((seg, i) => (
+                            <span key={i} className="flex items-center gap-1">
+                                <span className="text-gray-300 dark:text-gray-600">/</span>
                                 <button
-                                    onClick={() => file.IsDir ? navigateTo(file) : handleDownload(file)}
-                                    className="flex items-center gap-3 text-left min-w-0"
+                                    onClick={() => navigate(`/s/${shareId}/${breadcrumbs.slice(0, i + 1).join('/')}`)}
+                                    className="hover:text-blue-600 dark:hover:text-blue-400 transition"
                                 >
-                                    {file.IsDir ? (
-                                        <svg className="w-5 h-5 text-blue-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-                                    ) : (
-                                        <svg className="w-5 h-5 text-gray-400 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" /></svg>
-                                    )}
-                                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{file.Name}</span>
+                                    {seg}
                                 </button>
-                                <span className="w-24 text-right text-sm text-gray-500 dark:text-gray-400 self-center">
-                                    {file.IsDir ? '—' : formatSize(file.Size)}
-                                </span>
-                                <span className="w-40 text-right text-sm text-gray-500 dark:text-gray-400 self-center hidden sm:block">
-                                    {formatDate(file.ModTime)}
-                                </span>
-                                <span className="w-10 flex items-center justify-center">
-                                    {!file.IsDir && (
-                                        <button
-                                            onClick={() => handleDownload(file)}
-                                            className="p-1 text-gray-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition"
-                                            title="Download"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                                        </button>
-                                    )}
-                                </span>
-                            </div>
+                            </span>
                         ))}
-                    </div>
-                )}
+                    </nav>
+
+                    <Toolbar
+                        uploading={uploading}
+                        uploadProgress={uploadProgress}
+                        sortBy={sortBy}
+                        sortOrder={sortOrder}
+                        viewMode={viewMode}
+                        onSortToggle={toggleSort}
+                        onSortOrderToggle={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                        onViewModeToggle={() => setViewMode(prev => prev === 'grid' ? 'list' : 'grid')}
+                        onUploadClick={writeable ? handleUploadClick : undefined}
+                    />
+                </div>
+
+                {/* Files */}
+                <div onClick={e => e.stopPropagation()}>
+                    {filesLoading ? (
+                        <div className="text-center py-16 text-gray-500 dark:text-gray-400">Loading files...</div>
+                    ) : (
+                        <FileGrid
+                            files={sortedFiles}
+                            viewMode={viewMode}
+                            selectedNames={selectedNames}
+                            draggedFiles={[]}
+                            dropTarget={null}
+                            currentPath={currentPath}
+                            onFileClick={handleFileClickWrapper}
+                            onFileDoubleClick={handleFileDoubleClick}
+                            onContextMenu={handleContextMenu}
+                            onDragStart={noop}
+                            onDragEnd={noop}
+                            onFolderDragOver={noop}
+                            onFolderDragLeave={noop}
+                            onFolderDrop={noop}
+                        />
+                    )}
+                </div>
 
                 {/* Share info footer */}
                 {info?.expiration && (
@@ -268,6 +302,41 @@ export default function ShareBrowser() {
                     </p>
                 )}
             </div>
+
+            {/* Upload input */}
+            {writeable && <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileChange} />}
+
+            {/* Selection bar (delete only) */}
+            {writeable && (
+                <SelectionBar
+                    count={selectedNames.size}
+                    onDelete={() => { handleDelete(getSelectedItems()); clearSelection(); }}
+                    onClear={clearSelection}
+                />
+            )}
+
+            {/* Context menu */}
+            {writeable && contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    files={contextMenu.files}
+                    onClose={() => setContextMenu(null)}
+                    onOpen={handleFileDoubleClick}
+                    onRename={() => {
+                        if (contextMenu.files[0]) handleRename(contextMenu.files[0]);
+                        setContextMenu(null);
+                    }}
+                    onDelete={() => {
+                        handleDelete(contextMenu.files);
+                        setContextMenu(null);
+                    }}
+                    onNewFolder={() => { setContextMenu(null); handleNewFolder(); }}
+                    onSelectAll={() => { setContextMenu(null); selectAll(); }}
+                    hasFiles={files.length > 0}
+                    currentFolderName={breadcrumbs[breadcrumbs.length - 1] || info?.name || ''}
+                />
+            )}
         </div>
     );
 }

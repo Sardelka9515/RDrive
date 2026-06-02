@@ -130,6 +130,7 @@ export interface ShareResponse {
     views: number;
     maxDownloads: number;
     isPublic: boolean;
+    allowWrite: boolean;
     recipients?: ShareRecipient[];
 }
 
@@ -142,6 +143,7 @@ export interface CreateShareRequest {
     expiration?: string;
     maxDownloads: number;
     isPublic: boolean;
+    allowWrite: boolean;
     recipients: ShareRecipient[];
 }
 
@@ -152,6 +154,7 @@ export interface UpdateShareRequest {
     expiration?: string;
     maxDownloads: number;
     isPublic: boolean;
+    allowWrite: boolean;
     recipients: ShareRecipient[];
 }
 
@@ -602,4 +605,73 @@ export const api = {
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
     },
+
+    // Write operations on an editable share (require the share to be AllowWrite; the
+    // X-Share-Token header carries the password token when the share is protected).
+    uploadShareFile: (id: string, dirPath: string, file: File, token?: string, onProgress?: (progress: number) => void): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const cleanDir = dirPath.replace(/^\/+|\/+$/g, '');
+            const encodedPath = cleanDir.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+            const url = encodedPath
+                ? `${API_BASE}/p/shares/${id}/upload/${encodedPath}`
+                : `${API_BASE}/p/shares/${id}/upload`;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url);
+            if (token) xhr.setRequestHeader('X-Share-Token', token);
+
+            if (onProgress) {
+                xhr.upload.onprogress = (event) => {
+                    if (event.lengthComputable) onProgress((event.loaded / event.total) * 100);
+                };
+            }
+
+            xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                else reject(new Error(xhr.responseText || 'Failed to upload file'));
+            };
+            xhr.onerror = () => reject(new Error('Network error during upload'));
+            xhr.send(formData);
+        });
+    },
+
+    deleteShareFile: async (id: string, path: string, token?: string): Promise<void> => {
+        const headers: Record<string, string> = {};
+        if (token) headers['X-Share-Token'] = token;
+        const res = await fetch(`${API_BASE}/p/shares/${id}/files/${encodeSharePath(path)}`, {
+            method: 'DELETE',
+            headers,
+        });
+        if (!res.ok) throw new Error((await res.text()) || 'Failed to delete item');
+    },
+
+    renameShareFile: async (id: string, path: string, newPath: string, token?: string, isDir: boolean = false): Promise<void> => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (token) headers['X-Share-Token'] = token;
+        const res = await fetch(`${API_BASE}/p/shares/${id}/rename/${encodeSharePath(path)}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ NewPath: newPath, IsDir: isDir }),
+        });
+        if (!res.ok) throw new Error((await res.text()) || 'Failed to rename item');
+    },
+
+    createShareDirectory: async (id: string, path: string, token?: string): Promise<void> => {
+        const headers: Record<string, string> = {};
+        if (token) headers['X-Share-Token'] = token;
+        const res = await fetch(`${API_BASE}/p/shares/${id}/mkdir/${encodeSharePath(path)}`, {
+            method: 'POST',
+            headers,
+        });
+        if (!res.ok) throw new Error((await res.text()) || 'Failed to create directory');
+    },
 };
+
+// Per-segment encoding that preserves slashes as real path separators — the public share
+// catch-all routes keep literal slashes and don't URL-unescape the whole path.
+function encodeSharePath(path: string): string {
+    return path.replace(/^\/+|\/+$/g, '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
+}

@@ -88,6 +88,8 @@ public class Share
     
     public bool IsPublic { get; set; }
 
+    public bool AllowWrite { get; set; } // If true, anyone who can open the share can also upload/modify files
+
     public List<ShareRecipient> Recipients { get; set; } = new();
 }
 

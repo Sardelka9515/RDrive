@@ -1,7 +1,7 @@
 interface SelectionBarProps {
     count: number;
-    onCopy: () => void;
-    onMove: () => void;
+    onCopy?: () => void; // Omit to hide (e.g. share contexts without copy/move)
+    onMove?: () => void;
     onDelete: () => void;
     onClear: () => void;
 }
@@ -24,18 +24,22 @@ export function SelectionBar({
                 {count} selected
             </span>
             <div className="h-6 w-px bg-gray-300 dark:border-gray-600 hidden md:block" />
-            <button
-                onClick={onCopy}
-                className="px-4 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium shadow-sm"
-            >
-                Copy
-            </button>
-            <button
-                onClick={onMove}
-                className="px-4 py-2 text-sm bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-all font-medium shadow-sm"
-            >
-                Move
-            </button>
+            {onCopy && (
+                <button
+                    onClick={onCopy}
+                    className="px-4 py-2 text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-all font-medium shadow-sm"
+                >
+                    Copy
+                </button>
+            )}
+            {onMove && (
+                <button
+                    onClick={onMove}
+                    className="px-4 py-2 text-sm bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/50 transition-all font-medium shadow-sm"
+                >
+                    Move
+                </button>
+            )}
             <button
                 onClick={onDelete}
                 className="px-4 py-2 text-sm bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-all font-medium shadow-sm"

@@ -242,6 +242,7 @@ export default function FileBrowser() {
                 expiration: form.Expiration ? new Date(form.Expiration).toISOString() : undefined,
                 maxDownloads: form.MaxDownloads,
                 isPublic: form.IsPublic,
+                allowWrite: form.AllowWrite,
                 recipients: form.Recipients,
             };
             const share = await api.createShare(req);

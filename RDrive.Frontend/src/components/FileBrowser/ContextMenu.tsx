@@ -8,10 +8,10 @@ interface ContextMenuProps {
     onClose: () => void;
     onOpen: (e: React.MouseEvent, file: FileItemType) => void;
     onRename: () => void;
-    onCopy: () => void;
-    onMove: () => void;
-    onSync: () => void;
-    onShare: () => void;
+    onCopy?: () => void; // Optional actions hide when not provided (e.g. public share contexts)
+    onMove?: () => void;
+    onSync?: () => void;
+    onShare?: () => void;
     onDelete: () => void;
     onNewFolder: () => void;
     onSelectAll: () => void;
@@ -87,19 +87,23 @@ export function ContextMenu({
                         >
                             Rename
                         </button>
-                        <button
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                            onClick={onCopy}
-                        >
-                            Copy to...
-                        </button>
-                        <button
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                            onClick={onMove}
-                        >
-                            Move to...
-                        </button>
-                        {files[0].IsDir && (
+                        {onCopy && (
+                            <button
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                onClick={onCopy}
+                            >
+                                Copy to...
+                            </button>
+                        )}
+                        {onMove && (
+                            <button
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                onClick={onMove}
+                            >
+                                Move to...
+                            </button>
+                        )}
+                        {files[0].IsDir && onSync && (
                             <button
                                 className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
                                 onClick={onSync}
@@ -107,14 +111,18 @@ export function ContextMenu({
                                 Sync to...
                             </button>
                         )}
-                        <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                        <button
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center gap-2"
-                            onClick={onShare}
-                        >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                            Share...
-                        </button>
+                        {onShare && (
+                            <>
+                                <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                                <button
+                                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center gap-2"
+                                    onClick={onShare}
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                    Share...
+                                </button>
+                            </>
+                        )}
                         <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                         <button
                             className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all font-medium"
@@ -129,18 +137,22 @@ export function ContextMenu({
                         <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700 font-semibold bg-gradient-to-r from-blue-50 to-transparent dark:from-blue-900/20 dark:to-transparent text-gray-900 dark:text-white">
                             {files.length} items selected
                         </div>
-                        <button
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                            onClick={onCopy}
-                        >
-                            Copy to...
-                        </button>
-                        <button
-                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                            onClick={onMove}
-                        >
-                            Move to...
-                        </button>
+                        {onCopy && (
+                            <button
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                onClick={onCopy}
+                            >
+                                Copy to...
+                            </button>
+                        )}
+                        {onMove && (
+                            <button
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                                onClick={onMove}
+                            >
+                                Move to...
+                            </button>
+                        )}
                         <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
                         <button
                             className="w-full text-left px-4 py-2.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 transition-all font-medium"
@@ -170,33 +182,43 @@ export function ContextMenu({
                             Select All
                         </button>
                     )}
-                    <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                    <button
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                        onClick={onCopy}
-                    >
-                        Copy this folder to...
-                    </button>
-                    <button
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                        onClick={onMove}
-                    >
-                        Move this folder to...
-                    </button>
-                    <button
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
-                        onClick={onSync}
-                    >
-                        Sync this folder to...
-                    </button>
-                    <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
-                    <button
-                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center gap-2"
-                        onClick={onShare}
-                    >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                        Share this folder...
-                    </button>
+                    {(onCopy || onMove || onSync) && <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />}
+                    {onCopy && (
+                        <button
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                            onClick={onCopy}
+                        >
+                            Copy this folder to...
+                        </button>
+                    )}
+                    {onMove && (
+                        <button
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                            onClick={onMove}
+                        >
+                            Move this folder to...
+                        </button>
+                    )}
+                    {onSync && (
+                        <button
+                            className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all"
+                            onClick={onSync}
+                        >
+                            Sync this folder to...
+                        </button>
+                    )}
+                    {onShare && (
+                        <>
+                            <div className="h-px bg-gray-200 dark:bg-gray-700 my-1" />
+                            <button
+                                className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all flex items-center gap-2"
+                                onClick={onShare}
+                            >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                                Share this folder...
+                            </button>
+                        </>
+                    )}
                 </>
             )}
         </div>

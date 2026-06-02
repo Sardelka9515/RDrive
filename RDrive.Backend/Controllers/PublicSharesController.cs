@@ -47,7 +47,7 @@ public class PublicSharesController : ControllerBase
             Description = share.Description,
             HasPassword = !string.IsNullOrEmpty(share.Password),
             Expiration = share.Expiration,
-            Writeable = false // TODO: if user is logged in check permissions, or if public share has write
+            Writeable = share.AllowWrite
         });
     }
 
@@ -162,6 +162,90 @@ public class PublicSharesController : ControllerBase
         }
     }
 
+    [HttpDelete("{id}/files/{*path}")]
+    public async Task<IActionResult> DeleteItem(Guid id, string path)
+    {
+        if (!AuthorizeAccess(id, out var share, requireWrite: true)) return Unauthorized();
+
+        path = path.TrimStart('/');
+        if (path.Contains("..")) return BadRequest("Invalid path.");
+
+        var remotePath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
+
+        try
+        {
+            var fs = await _resolver.GetFsForRemoteAsync(share.Remote);
+            // Try deleting as a file first; fall back to purging a directory.
+            try
+            {
+                await _rclone.DeleteFileAsync(fs, remotePath);
+                return Ok();
+            }
+            catch
+            {
+                await _rclone.PurgeAsync(fs, remotePath);
+                return Ok();
+            }
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Failed to delete: {ex.Message}");
+        }
+    }
+
+    [HttpPost("{id}/rename/{*path}")]
+    public async Task<IActionResult> RenameItem(Guid id, string path, [FromBody] RenameRequest request)
+    {
+        if (!AuthorizeAccess(id, out var share, requireWrite: true)) return Unauthorized();
+
+        path = path.TrimStart('/');
+        var newPath = request.NewPath.TrimStart('/');
+        if (path.Contains("..") || newPath.Contains("..")) return BadRequest("Invalid path.");
+
+        var srcPath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
+        var dstPath = string.IsNullOrEmpty(share.Path) ? newPath : $"{share.Path}/{newPath}".TrimStart('/');
+
+        try
+        {
+            var fs = await _resolver.GetFsForRemoteAsync(share.Remote);
+            if (request.IsDir)
+            {
+                await _rclone.StartMoveAsync($"{fs}/{srcPath}", $"{fs}/{dstPath}");
+            }
+            else
+            {
+                await _rclone.MoveFileAsync(fs, srcPath, fs, dstPath);
+            }
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Failed to rename: {ex.Message}");
+        }
+    }
+
+    [HttpPost("{id}/mkdir/{*path}")]
+    public async Task<IActionResult> CreateDirectory(Guid id, string path)
+    {
+        if (!AuthorizeAccess(id, out var share, requireWrite: true)) return Unauthorized();
+
+        path = path.TrimStart('/');
+        if (path.Contains("..")) return BadRequest("Invalid path.");
+
+        var remotePath = string.IsNullOrEmpty(share!.Path) ? path : $"{share.Path}/{path}".TrimStart('/');
+
+        try
+        {
+            var fs = await _resolver.GetFsForRemoteAsync(share.Remote);
+            await _rclone.MkdirAsync(fs, remotePath);
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"Failed to create directory: {ex.Message}");
+        }
+    }
+
     private bool AuthorizeAccess(Guid shareId, out Share? share, bool requireWrite = false)
     {
         share = _db.Shares.Include(s => s.Recipients).FirstOrDefault(s => s.Id == shareId);
@@ -178,60 +262,27 @@ public class PublicSharesController : ControllerBase
             if (!ValidateToken(token, shareId)) return false;
         }
 
-        // 2. Check Recipients restrictions
-        // If recipients exist, user MUST be authenticated via main Auth and match email
-        // OR we support "Public" access if IsPublic is true.
-
-        if (share.Recipients.Any())
+        // 2. Read gate — restricted (non-public) shares require a logged-in recipient.
+        if (!share.IsPublic)
         {
-            // If IsPublic is false, we strictly enforce recipient check.
-            // If IsPublic is true, maybe recipients are for Write access?
-            // Let's stick to: If Recipients exist AND IsPublic is false -> Restricted.
-            // If IsPublic is true -> Open to everyone (Recipients ignored for Read, but maybe used for Write?)
-
-            if (!share.IsPublic)
+            if (share.Recipients.Any())
             {
-                // User must be logged in
-                // Since this controller is not [Authorize], we need to check User.Identity manually if available.
-                // We might need to mix [Authorize] on specific paths or check HttpContext.User
-                // Note: If the user is authenticated via Bearer token (main app login), User.Identity.Name should be set.
-
+                // Note: this controller is not [Authorize]; we read the ambient bearer identity if present.
                 var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
                 if (string.IsNullOrEmpty(userEmail)) return false; // Not logged in
 
                 var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
-                if (recipient == null) return false; // Not on list
-
-                if (requireWrite && recipient.Permission != "Write") return false;
+                if (recipient == null) return false; // Not on the list
             }
             else
             {
-                // Public share, but maybe checking write permission?
-                if (requireWrite)
-                {
-                    // Public RW? Unlikely to be safe.
-                    // Assume Public is ReadOnly unless specific recipient?
-                    // Let's safe default: Public = Read Only. 
-                    // Write requires specific recipient permission?
-                    // Or separate "Public Write" flag (not in schema).
-
-                    // Check if user is in recipient list with Write
-                    var userEmail = User.FindFirst(ClaimTypes.Email)?.Value ?? User.Identity?.Name;
-                    if (!string.IsNullOrEmpty(userEmail))
-                    {
-                        var recipient = share.Recipients.FirstOrDefault(r => r.Email.Equals(userEmail, StringComparison.OrdinalIgnoreCase));
-                        if (recipient != null && recipient.Permission == "Write") return true;
-                    }
-                    return false; // Public write not allowed by default
-                }
+                return false; // Not public, no recipients -> no access
             }
         }
-        else
-        {
-            // No recipients.
-            if (!share.IsPublic) return false; // Not public, no recipients -> No access (Or creator only? Creator logic not implemented here)
-            if (requireWrite) return false; // Public write disabled by default
-        }
+
+        // 3. Write gate — editing is allowed whenever the share is marked editable.
+        // Anyone who passes the read gate above (incl. the password token, when set) may write.
+        if (requireWrite && !share.AllowWrite) return false;
 
         return true;
     }

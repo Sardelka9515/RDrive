@@ -12,6 +12,7 @@ public class CreateShareRequest
     public DateTime? Expiration { get; set; }
     public int MaxDownloads { get; set; }
     public bool IsPublic { get; set; }
+    public bool AllowWrite { get; set; }
     public List<ShareRecipientDto> Recipients { get; set; } = new();
 }
 
@@ -23,6 +24,7 @@ public class UpdateShareRequest
     public DateTime? Expiration { get; set; }
     public int MaxDownloads { get; set; }
     public bool IsPublic { get; set; }
+    public bool AllowWrite { get; set; }
     public List<ShareRecipientDto> Recipients { get; set; } = new();
 }
 
@@ -46,6 +48,7 @@ public class ShareResponse
     public int Views { get; set; }
     public int MaxDownloads { get; set; }
     public bool IsPublic { get; set; }
+    public bool AllowWrite { get; set; }
     public List<ShareRecipientDto> Recipients { get; set; } = new();
 }
 
