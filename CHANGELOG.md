@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0](https://github.com/Sardelka9515/RDrive/compare/v0.5.0...v0.6.0) (2026-06-02)
+
+
+### Features
+
+* add editable (writeable) public shares ([efad3e3](https://github.com/Sardelka9515/RDrive/commit/efad3e31e0660e398ebb06b43582bef32b7c68a9))
+* add streaming image viewer and video player to file browser ([113184d](https://github.com/Sardelka9515/RDrive/commit/113184d596fec7328291f93a57fe01faf37d1236))
+* update favicon and add Logo component for branding consistency ([09b1a22](https://github.com/Sardelka9515/RDrive/commit/09b1a22a081056558110b40063337d3ecc4201a8))
+
 ## [0.5.0](https://github.com/Sardelka9515/RDrive/compare/v0.4.0...v0.5.0) (2026-06-01)
 
 
